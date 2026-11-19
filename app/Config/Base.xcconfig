@@ -1,0 +1,6 @@
+// Shared build settings. Personal signing values live in Local.xcconfig (git-ignored).
+PRODUCT_BUNDLE_IDENTIFIER = com.atharvan16.vocab
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Xcode / build output
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Personal signing settings (team ID); see app/Config/Local.xcconfig.example
+app/Config/Local.xcconfig
+
+# Secrets
+.env
+.env.*
+*.p8
+*.p12
+*.mobileprovision
+
+# Python / research scratch
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/
+spike/
