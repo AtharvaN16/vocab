@@ -3,7 +3,8 @@ import Foundation
 /// Live lookups against English Wiktionary (CC BY-SA 4.0). PoC only: the
 /// shipped app would prefer the downloadable offline dictionary.
 enum Wiktionary {
-    static let userAgent = "Vocab/0.1 (open-source vocabulary app)"
+    // Wikimedia policy: name/version plus contact URL, or requests fall to the 10 req/min tier.
+    static let userAgent = "Vocab/0.1 (https://github.com/AtharvaN16/vocab)"
 
     enum LookupError: LocalizedError {
         case notFound
