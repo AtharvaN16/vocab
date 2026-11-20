@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search Centre Stage</title>
+<style>
+  :root {
+    --page: #f4f4f4; --card: #eaeaea; --control: #e6e6e6; --sheet: #fff;
+    --ink: #111; --ink2: #8a8a8a; --ink3: #b8b8b8; --line: #dcdcdc; --canvas: #fafafa;
+    --note: #fff8d6; --noteInk: #5c4d00; --kb: #d3d5db; --key: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #000; --card: #1c1c1c; --control: #292929; --sheet: #1c1c1c;
+      --ink: #f2f2f2; --ink2: #8d8d8d; --ink3: #555; --line: #333; --canvas: #0d0d0d;
+      --note: #2b2610; --noteInk: #e8d89a; --kb: #2b2b2b; --key: #575757;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #000; --card: #1c1c1c; --control: #292929; --sheet: #1c1c1c;
+    --ink: #f2f2f2; --ink2: #8d8d8d; --ink3: #555; --line: #333; --canvas: #0d0d0d;
+    --note: #2b2610; --noteInk: #e8d89a; --kb: #2b2b2b; --key: #575757;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--canvas); color: var(--ink); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; padding: 40px 16px 80px; }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .lede { color: var(--ink2); max-width: 700px; margin-top: 8px; }
+  .lede b { color: var(--ink); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink2); margin: 52px 0 6px; font-weight: 600; }
+  .sub { color: var(--ink2); margin-bottom: 20px; max-width: 700px; }
+  .row { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  figure { width: 280px; }
+  figcaption { margin-top: 14px; font-size: 13px; color: var(--ink2); }
+  figcaption > b { color: var(--ink); display: block; font-size: 14px; margin-bottom: 2px; }
+
+  /* Phone */
+  .phone { width: 280px; height: 590px; border-radius: 40px; border: 1.5px solid var(--line); background: var(--page); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .status { height: 34px; display: flex; justify-content: space-between; align-items: center; padding: 0 26px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .status i { width: 46px; height: 8px; border-radius: 4px; background: var(--line); display: block; }
+  .home { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); width: 96px; height: 4px; border-radius: 2px; background: var(--ink); opacity: .8; z-index: 9; }
+  .top { display: flex; justify-content: space-between; align-items: center; padding: 4px 14px 0; height: 44px; flex-shrink: 0; position: relative; }
+
+  .cbtn { width: 36px; height: 36px; border-radius: 50%; background: var(--control); display: grid; place-items: center; flex-shrink: 0; position: relative; }
+  .cbtn svg { width: 15px; height: 15px; }
+  .cbtn.lg { width: 46px; height: 46px; }
+  .cbtn.lg svg { width: 18px; height: 18px; }
+  .cbtn.ink { background: var(--ink); color: var(--page); }
+  .cbtn.rec { background: var(--ink); color: var(--page); box-shadow: 0 0 0 6px var(--control); }
+
+  /* Centre stage */
+  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 22px; text-align: center; position: relative; }
+  .big { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+  .big.ph { color: var(--ink3); }
+  .caret { display: inline-block; width: 2.5px; height: 28px; background: #2f7cf6; vertical-align: -5px; margin-left: 2px; border-radius: 1px; }
+  .sugg { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .sugg p { font-size: 17px; font-weight: 500; color: var(--ink2); }
+  .sugg p b { color: var(--ink); font-weight: 600; }
+  .sugg .meta { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink3); margin-bottom: -4px; }
+
+  /* Bottom controls — the Ask composer's parts */
+  .controls { display: flex; align-items: center; gap: 8px; padding: 10px 14px 12px; flex-shrink: 0; position: relative; }
+  .controls.safe { padding-bottom: 26px; }
+  .pill { height: 36px; border-radius: 18px; background: var(--control); padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .pill svg { width: 12px; height: 12px; }
+  .pill.ink { background: var(--ink); color: var(--page); }
+  .pill .chev { color: var(--ink2); font-size: 9px; }
+  .grow { flex: 1; }
+
+  /* Keyboard */
+  .kb { height: 190px; background: var(--kb); flex-shrink: 0; padding: 8px 4px 26px; display: flex; flex-direction: column; gap: 7px; }
+  .kb .kr { display: flex; gap: 4px; justify-content: center; flex: 1; }
+  .kb .kr span { flex: 1; max-width: 24px; background: var(--key); border-radius: 5px; }
+  .kb .kr.last span { max-width: none; }
+  .kb .kr.last span:first-child, .kb .kr.last span:last-child { flex: 0 0 62px; }
+  .kb .go { background: #2f7cf6 !important; color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+
+  /* Answer (AskView style) */
+  .scroll { flex: 1; min-height: 0; overflow: hidden; padding: 6px 22px 0; position: relative; }
+  .q { font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .muted { color: var(--ink2); }
+  .ans { margin-top: 14px; padding: 0 4px; }
+  .cand { padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; position: relative; }
+  .cand:last-child { border-bottom: 0; }
+  .cand .txt { flex: 1; min-width: 0; }
+  .cand b { font-size: 19px; font-weight: 700; display: block; letter-spacing: -0.01em; }
+  .cand span.d { font-size: 12.5px; color: var(--ink2); line-height: 1.35; display: block; }
+  .tick { font-size: 12px; color: var(--ink2); font-weight: 600; }
+  .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 36px; background: linear-gradient(to bottom, transparent, var(--page)); }
+  .follow { flex-shrink: 0; padding: 4px 14px 0; }
+  .follow .in { text-align: center; color: var(--ink2); font-size: 16px; padding: 4px 0 10px; }
+
+  /* Pushback (BottomSheet .large/.medium): page scales 0.93, dims 0.2, rounds 14; sheet floats 8pt in, r32 */
+  .phone.pb { background: #000; }
+  .pushed { position: absolute; inset: 0; background: var(--page); transform: scale(.93); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .pushed::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.2); }
+  .fsheet { position: absolute; left: 7px; right: 7px; bottom: 7px; background: var(--sheet); border-radius: 30px; padding: 14px 18px 26px; z-index: 3; }
+  .shdr { display: flex; justify-content: space-between; align-items: center; margin: 0 -4px 10px; }
+  .word { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
+  .wline { display: flex; align-items: center; gap: 10px; }
+  .why { background: var(--card); border-radius: 14px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45; margin-top: 12px; position: relative; }
+  .why b { display: flex; align-items: center; gap: 5px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink2); margin-bottom: 2px; }
+  .why b svg { width: 10px; height: 10px; }
+  .sense { margin-top: 12px; }
+  .sense small { font-size: 12px; font-weight: 500; color: var(--ink2); }
+  .sense p { font-size: 15px; line-height: 1.35; margin-top: 1px; }
+  .sense i { display: block; font-size: 12.5px; color: var(--ink2); margin-top: 3px; }
+  .btnrow { display: flex; gap: 8px; margin-top: 16px; }
+  .btn { flex: 1; height: 44px; border-radius: 22px; background: var(--control); display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: 600; font-size: 14px; }
+  .btn.ink { background: var(--ink); color: var(--page); }
+
+  /* Waveform */
+  .wave { display: flex; gap: 3px; align-items: center; height: 26px; margin-top: 18px; }
+  .wave i { width: 3px; border-radius: 2px; background: var(--ink2); display: block; }
+
+  /* Annotations */
+  .pin { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #e0442e; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; z-index: 8; box-shadow: 0 0 0 3px var(--page); }
+  ol.notes { margin: 10px 0 0; list-style: none; counter-reset: n; font-size: 12.5px; color: var(--ink2); display: flex; flex-direction: column; gap: 5px; }
+  ol.notes li { counter-increment: n; position: relative; padding-left: 23px; }
+  ol.notes li::before { content: counter(n); position: absolute; left: 0; top: 1px; width: 16px; height: 16px; border-radius: 50%; background: #e0442e; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+
+  .qs { margin-top: 52px; background: var(--note); color: var(--noteInk); border-radius: 18px; padding: 22px 24px; max-width: 760px; }
+  .qs h3 { font-size: 15px; margin-bottom: 10px; }
+  .qs li { margin: 6px 0 0 18px; font-size: 14px; }
+  @media (max-width: 640px) { .row { justify-content: center; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2l1.9 5.6a3 3 0 0 0 1.9 1.9L21.5 11.4l-5.7 1.9a3 3 0 0 0-1.9 1.9L12 21l-1.9-5.8a3 3 0 0 0-1.9-1.9L2.5 11.4l5.7-1.9a3 3 0 0 0 1.9-1.9z"/></symbol>
+  <symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="2.2" fill="none"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="wave" viewBox="0 0 24 24"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="speaker" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="menu" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.4" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.6" fill="none"/><path stroke="currentColor" stroke-width="2.6" stroke-linecap="round" d="M15.5 15.5L20 20"/></symbol>
+</svg>
+
+<div class="wrap">
+  <h1>Search, centre stage — wireframes v3</h1>
+  <p class="lede"><b>No sheet and no search bar.</b> Search takes over the whole screen. What you type is set large in the middle, the way a question looks in Ask. Dictionary matches appear under it, and <b>Ask AI</b> stays one tap away next to the mic. Anything that needs a closer look, like a word’s entry, opens in your existing pushback <code>BottomSheet</code>.</p>
+
+  <h2>1 · Typing</h2>
+  <p class="sub">The deck fades out and the text field fills the screen. There’s no field outline; the text itself is the field.</p>
+  <div class="row">
+
+    <!-- Empty -->
+    <figure>
+      <div class="phone">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="top"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+        <div class="stage">
+          <div class="big ph" style="position:relative">Type a word,<br>or ask anything<span class="caret" style="height:26px"></span>
+            <div class="pin" style="right:-16px;top:-6px">1</div></div>
+          <div class="sugg" style="position:relative">
+            <div class="pin" style="right:-26px;top:-4px">2</div>
+            <p><b>Find a word for…</b></p>
+            <p>petrichor</p>
+            <p>sanctimonious</p>
+          </div>
+        </div>
+        <div class="controls">
+          <span class="grow"></span>
+          <span class="cbtn lg"><svg><use href="#mic"/></svg><div class="pin" style="right:-6px;top:-8px">3</div></span>
+        </div>
+        <div class="kb"><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr last"><span></span><span></span><span class="go">search</span></div></div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Opened</b>
+        <ol class="notes">
+          <li>The placeholder sits large in the middle, with the keyboard already up.</li>
+          <li>Below it, in the Ask preset style: <i>Find a word for…</i> first, then recent lookups.</li>
+          <li>Your existing <code>Dictation</code> mic. It’s the only control until there’s text.</li>
+        </ol>
+      </figcaption>
+    </figure>
+
+    <!-- Typing a word -->
+    <figure>
+      <div class="phone">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="top"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+        <div class="stage">
+          <div class="big">serend<span class="caret"></span></div>
+          <div class="sugg" style="position:relative">
+            <div class="pin" style="right:-26px;top:-4px">1</div>
+            <p><b>serendipity</b></p>
+            <p>serendipitous</p>
+            <p>serendipitously</p>
+          </div>
+        </div>
+        <div class="controls">
+          <span class="pill" style="position:relative"><svg><use href="#spark"/></svg>Ask AI<div class="pin" style="right:-10px;top:-10px">2</div></span>
+          <span class="grow"></span>
+          <span class="cbtn lg"><svg><use href="#mic"/></svg></span>
+        </div>
+        <div class="kb"><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr last"><span></span><span></span><span class="go">search</span></div></div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Typing a word</b>
+        <ol class="notes">
+          <li>Wiktionary matches appear centred under the text. Tap one, or press return for the top match, to open its entry in the sheet.</li>
+          <li><i>Ask AI</i> appears as soon as there’s text. It stays grey while the text looks like a word.</li>
+        </ol>
+      </figcaption>
+    </figure>
+
+    <!-- Typing a phrase -->
+    <figure>
+      <div class="phone">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="top"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+        <div class="stage">
+          <div class="big">a word for fake modesty<span class="caret"></span></div>
+          <div class="sugg"><p style="font-size:14px">No dictionary match</p></div>
+        </div>
+        <div class="controls">
+          <span class="pill ink" style="position:relative"><svg><use href="#spark"/></svg>Ask AI<div class="pin" style="right:-10px;top:-10px">1</div></span>
+          <span class="grow"></span>
+          <span class="cbtn lg"><svg><use href="#mic"/></svg></span>
+        </div>
+        <div class="kb"><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="kr last" style="position:relative"><span></span><span></span><span class="go">ask</span><div class="pin" style="right:-2px;top:-12px">2</div></div></div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Typing a description or question</b>
+        <ol class="notes">
+          <li>Once the text stops looking like a word, Ask AI turns ink and becomes the default action.</li>
+          <li>The return key reads <i>ask</i>. Dictionary matches, if there are any, stay above, so you can still pick one.</li>
+        </ol>
+      </figcaption>
+    </figure>
+
+    <!-- Dictating -->
+    <figure>
+      <div class="phone">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="top"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+        <div class="stage">
+          <div class="big">the feeling after finishing a long book<span class="caret"></span></div>
+          <div class="wave"><i style="height:8px"></i><i style="height:16px"></i><i style="height:24px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:9px"></i><i style="height:17px"></i><i style="height:6px"></i></div>
+        </div>
+        <div class="controls safe">
+          <span class="pill ink"><svg><use href="#spark"/></svg>Ask AI</span>
+          <span class="grow"></span>
+          <span class="cbtn lg rec" style="position:relative"><svg><use href="#wave"/></svg><div class="pin" style="right:-10px;top:-12px">1</div></span>
+        </div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Dictating</b>
+        <ol class="notes"><li>Tap the mic: the keyboard drops away and the transcript fills the middle as you speak. This is the same <code>Dictation</code> and the same mic-to-waveform symbol swap as Ask. Spoken descriptions are where Ask AI helps most.</li></ol>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>2 · Results</h2>
+  <p class="sub">AI answers stay on the same screen. A word you pick opens in the pushback sheet over it, so the answer is right there when you close the sheet.</p>
+  <div class="row">
+
+    <!-- AI answer -->
+    <figure>
+      <div class="phone">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="top"><span class="cbtn"><svg><use href="#back"/></svg><div class="pin" style="right:-10px;top:-8px">1</div></span></div>
+        <div class="scroll">
+          <div class="q">a word for fake modesty</div>
+          <div class="ans">
+            <div class="cand" style="position:relative"><div class="txt"><b>mock-modest</b><span class="d">putting on a modesty you don’t feel</span></div><div class="pin" style="right:-8px;top:2px">2</div></div>
+            <div class="cand"><div class="txt"><b>self-deprecating</b><span class="d">belittling yourself, often for effect</span></div><span class="tick">✓ Saved</span></div>
+            <div class="cand"><div class="txt"><b>disingenuous</b><span class="d">less sincere than you pretend to be</span></div></div>
+            <div class="cand"><div class="txt"><b>humblebrag</b><span class="d">boasting disguised as modesty</span></div></div>
+          </div>
+          <div class="fade"></div>
+        </div>
+        <div class="follow" style="position:relative">
+          <div class="pin" style="right:12px;top:-6px">3</div>
+          <div class="in">Ask a follow-up</div>
+        </div>
+        <div class="controls safe">
+          <span class="pill">Apple Intelligence <span class="chev">▼</span></span>
+          <span class="grow"></span>
+          <span class="cbtn"><svg><use href="#mic"/></svg></span>
+          <span class="cbtn"><svg><use href="#up"/></svg></span>
+        </div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>AI answer, in place</b>
+        <ol class="notes">
+          <li>X becomes back, as in Search today. Back takes you to the text you typed so you can edit it.</li>
+          <li>The question rises to the top, as in Ask. Candidates are listed as words with a one-line gloss. Tap one to open it.</li>
+          <li>The composer below is Ask’s: frameless text, model pill, mic, send.</li>
+        </ol>
+      </figcaption>
+    </figure>
+
+    <!-- Word in pushback sheet -->
+    <figure>
+      <div class="phone pb">
+        <div class="pushed">
+          <div class="status"><span>9:41</span><i></i></div>
+          <div class="top"><span class="cbtn"><svg><use href="#back"/></svg></span></div>
+          <div class="scroll">
+            <div class="q">a word for fake modesty</div>
+            <div class="ans">
+              <div class="cand"><div class="txt"><b>mock-modest</b><span class="d">putting on a modesty you don’t feel</span></div></div>
+              <div class="cand"><div class="txt"><b>self-deprecating</b><span class="d">belittling yourself</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fsheet">
+          <div class="pin" style="left:-4px;top:-8px">1</div>
+          <div class="shdr"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+          <div class="wline"><span class="word">disingenuous</span><span class="cbtn" style="position:relative"><svg><use href="#speaker"/></svg><div class="pin" style="right:-10px;top:-10px">2</div></span></div>
+          <div class="why">
+            <b><svg><use href="#spark"/></svg>Why it fits</b>
+            It names the insincerity itself: “Her modesty about the prize was disingenuous.”
+            <div class="pin" style="right:-8px;top:-8px">3</div>
+          </div>
+          <div class="sense"><small>adjective</small><p>Not candid or sincere, typically by pretending one knows less than one does.</p></div>
+          <p style="font-size:10.5px;color:var(--ink2);margin-top:10px">From Wiktionary, CC BY-SA 4.0</p>
+          <div class="btnrow"><span class="btn ink">+ Add</span></div>
+        </div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Word in your pushback sheet</b>
+        <ol class="notes">
+          <li>Your existing <code>BottomSheet</code> at medium size. The answer behind scales back, dims and rounds, and swipe-down or a tap behind closes it.</li>
+          <li>Your <code>Speaker</code> reads the word aloud, using the same voice as everywhere else.</li>
+          <li>The only AI-specific piece: one “why it fits” line tied to what you asked. Definitions come from Wiktionary.</li>
+        </ol>
+      </figcaption>
+    </figure>
+
+    <!-- Dictionary word in sheet -->
+    <figure>
+      <div class="phone pb">
+        <div class="pushed">
+          <div class="status"><span>9:41</span><i></i></div>
+          <div class="top"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+          <div class="stage">
+            <div class="big">serendipity</div>
+            <div class="sugg"><p>serendipitous</p><p>serendipitously</p></div>
+          </div>
+        </div>
+        <div class="fsheet">
+          <div class="shdr"><span class="cbtn"><svg><use href="#x"/></svg></span></div>
+          <div class="wline"><span class="word">serendipity</span><span class="cbtn"><svg><use href="#speaker"/></svg></span></div>
+          <div class="sense"><small>noun</small><p>The occurrence of events by chance in a happy or beneficial way.</p><i>“a fortunate stroke of serendipity”</i></div>
+          <div class="btnrow" style="position:relative"><span class="btn"><svg width="13" height="13" style="vertical-align:-1px"><use href="#spark"/></svg> Ask about it</span><span class="btn ink">+ Add</span>
+            <div class="pin" style="left:-8px;top:-10px">1</div></div>
+        </div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Dictionary word, same sheet</b>
+        <ol class="notes"><li>Picking a plain dictionary match opens the same sheet, so every word looks the same wherever it came from. <i>Ask about it</i> runs the AI on this word, which makes the swipe-up Ask reachable from Search too.</li></ol>
+      </figcaption>
+    </figure>
+
+    <!-- Entry -->
+    <figure>
+      <div class="phone">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div style="padding:6px 18px 0;flex:1;display:flex;flex-direction:column">
+          <p style="text-align:center;font-size:12px;font-weight:500;color:var(--ink2);margin-bottom:12px">12 of 48</p>
+          <div style="background:var(--card);border-radius:22px;padding:22px;height:330px">
+            <div class="word" style="font-size:34px">sanctimonious</div>
+            <div style="font-size:21px;font-weight:700;color:var(--ink2);margin-top:10px;line-height:1.2">making a show of being morally superior</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-bottom:30px">
+            <span class="cbtn lg"><svg><use href="#menu"/></svg></span>
+            <span class="cbtn lg" style="position:relative"><svg><use href="#search"/></svg><div class="pin" style="right:-6px;top:-8px">1</div></span>
+          </div>
+        </div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Getting there</b>
+        <ol class="notes"><li>The deck is unchanged: the same search button, with no new button. The deck fades out and the search text takes the middle of the screen (or zooms out of the button). It no longer opens as a sheet.</li></ol>
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="qs">
+    <h3>Still open</h3>
+    <ul>
+      <li><b>When Ask AI turns ink:</b> I’d use a simple rule: two or more words, or a single word with no dictionary match. The grey Ask AI pill always works regardless.</li>
+      <li><b>Return key:</b> it follows the ink action: <i>search</i> for a word, <i>ask</i> for a phrase. Does that feel predictable, or should return always search?</li>
+      <li><b>Follow-ups:</b> keep the whole thread on the screen, or have each follow-up replace the answer, as Ask does today?</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

@@ -4,3 +4,10 @@ CODE_SIGN_STYLE = Automatic
 DEVELOPMENT_TEAM =
 
 #include? "Local.xcconfig"
+
+// Testing-only API key from the git-ignored app/.env (see app/.env.example).
+// It is merged into the Debug Info.plist; Release builds never carry it.
+GROQ_API_KEY =
+#include? "../.env"
+GROQ_API_KEY[config=Release] =
+INFOPLIST_FILE = Config/Info.plist

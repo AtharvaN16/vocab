@@ -3,6 +3,7 @@
 
 # Xcode / build output
 build/
+build-*/
 DerivedData/
 *.xcuserstate
 xcuserdata/
@@ -17,6 +18,7 @@ app/Config/Local.xcconfig
 # Secrets
 .env
 .env.*
+!.env.example
 *.p8
 *.p12
 *.mobileprovision

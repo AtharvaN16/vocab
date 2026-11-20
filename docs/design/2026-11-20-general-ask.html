@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>General Ask</title>
+<style>
+  :root { --bg:#FBFAF7; --doc:#1d1c1a; --muted:#77736b; --rule:#e6e2d9; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--doc); font:15px/1.5 -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width:1060px; margin:0 auto; padding:32px 16px 80px; }
+  h1 { font-size:26px; letter-spacing:-.02em; margin:0 0 6px; }
+  h2 { font-size:20px; letter-spacing:-.02em; margin:0 0 4px; }
+  p { max-width:720px; margin:6px 0; color:#3b3934; }
+  .bar { display:flex; gap:8px; margin:14px 0 0; }
+  .bar button { font:500 13px ui-monospace, Menlo, monospace; padding:7px 12px; border-radius:7px; border:1px solid var(--rule); background:#fff; color:var(--doc); cursor:pointer; }
+  .bar button.on { background:var(--doc); color:#fff; border-color:var(--doc); }
+  .concept { border-top:1px solid var(--rule); margin-top:40px; padding-top:28px; }
+  .tag { font:600 12px ui-monospace, Menlo, monospace; color:#c2562b; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; margin-top:20px; }
+  .step { display:flex; flex-direction:column; gap:10px; width:272px; }
+  .cap { font:12px/1.45 ui-monospace, Menlo, monospace; color:var(--muted); }
+  .cap b { color:var(--doc); }
+  .pros { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:6px 28px; margin-top:18px; font-size:14px; color:#3b3934; max-width:880px; }
+  .pros div::before { content:"+ "; color:#2f8a4f; font-weight:700; }
+  .pros div.con::before { content:"− "; color:#c2562b; }
+
+  /* the app, scaled to 0.7 of a 390 pt phone */
+  .phone { --page:#000; --card:#1C1C1C; --control:#292929; --sheet:#1C1C1C; --ink:#fff; --sec:rgba(235,235,245,.6); --ter:rgba(235,235,245,.3);
+           width:272px; height:588px; border-radius:40px; background:var(--page); color:var(--ink); position:relative; overflow:hidden;
+           box-shadow:0 0 0 6px #000, 0 18px 40px rgba(0,0,0,.18); font-family:-apple-system, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif; }
+  body.light .phone { --page:#F4F4F4; --card:#EAEAEA; --control:#E6E6E6; --sheet:#fff; --ink:#000; --sec:rgba(60,60,67,.6); --ter:rgba(60,60,67,.3); }
+  .sb { height:38px; display:flex; justify-content:space-between; align-items:center; padding:6px 24px 0; font:600 12px -apple-system, "Helvetica Neue", Arial, sans-serif; position:relative; z-index:3; }
+  .sb i { width:44px; height:9px; border-radius:3px; background:var(--ink); display:block; }
+  .caption { text-align:center; font:500 10px -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); margin:6px 0 10px; }
+  .card { position:absolute; left:17px; right:17px; background:var(--card); border-radius:20px; padding:22px; }
+  .card .w { font:700 36px/1.05 -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing:-.01em; margin-bottom:12px; }
+  .card .d { font:700 22px/1.2 -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); }
+  .bottombar { position:absolute; left:17px; right:17px; bottom:22px; display:flex; justify-content:space-between; align-items:center; }
+  .circle { width:45px; height:45px; border-radius:50%; background:var(--control); display:grid; place-items:center; color:var(--ink); }
+  .circle.sm { width:31px; height:31px; }
+  .circle.new { box-shadow:0 0 0 2px #FF9F0A; }
+  svg { display:block; }
+
+  .presets { display:flex; flex-direction:column; gap:18px; padding:0 30px; text-align:center; font:500 14px/1.3 -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); }
+  .composer { position:absolute; left:11px; right:11px; bottom:18px; }
+  .field { text-align:center; font:400 14px -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); padding:6px 0 14px; }
+  .field.typed { color:var(--ink); }
+  .controls { display:flex; align-items:center; gap:8px; }
+  .pill { height:31px; border-radius:99px; background:var(--control); display:inline-flex; align-items:center; gap:5px; padding:0 11px; font:500 10.5px -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--ink); white-space:nowrap; }
+  .pill .chev { color:var(--sec); }
+  .pill.word { font-weight:600; }
+  .pill.new { box-shadow:0 0 0 1.5px #FF9F0A; }
+  .send { width:31px; height:31px; border-radius:50%; background:var(--control); color:var(--sec); display:grid; place-items:center; }
+  .send.on { background:var(--ink); color:var(--page); }
+  .peek { position:absolute; left:17px; right:17px; top:-6px; height:52px; background:var(--card); border-radius:0 0 20px 20px; }
+  .q { font:500 15px/1.3 -apple-system, "Helvetica Neue", Arial, sans-serif; margin:0 0 12px; }
+  .ans { font:400 12px/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); }
+  .ans p { margin:0 0 9px; color:inherit; max-width:none; }
+  .ans b { color:var(--ink); font-weight:500; }
+  .ans u { color:var(--ink); font-weight:500; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px; text-decoration-color:var(--ter); }
+  .pad { padding:10px 26px 0; }
+  .keeps { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+
+  /* sheet */
+  .scrim { position:absolute; inset:0; background:rgba(0,0,0,.4); z-index:2; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; top:46px; background:var(--sheet); border-radius:26px 26px 0 0; z-index:4; padding:14px 0 0; }
+  .search { display:flex; gap:8px; align-items:center; padding:0 11px 9px; }
+  .sfield { flex:1; height:31px; border-radius:99px; background:var(--control); display:flex; align-items:center; gap:6px; padding:0 11px; font:400 11.5px -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); white-space:nowrap; overflow:hidden; }
+  .sfield.typed { color:var(--ink); }
+  .list div { padding:9px 16px; font:400 12.5px -apple-system, "Helvetica Neue", Arial, sans-serif; border-bottom:.5px solid var(--control); }
+  .list .ask { display:flex; gap:8px; align-items:flex-start; font-weight:500; }
+  .list .ask span.k { color:var(--sec); font-weight:400; }
+  .list .empty { color:var(--sec); border:0; font-size:11px; }
+  .cand { padding:12px 18px; display:flex; align-items:flex-start; gap:10px; }
+  .cand .t { flex:1; }
+  .cand .t b { display:block; font:700 20px/1.1 -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--ink); margin-bottom:3px; }
+  .cand .t span { font:400 11px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--sec); }
+  .add { height:26px; border-radius:99px; background:var(--control); display:inline-flex; align-items:center; gap:4px; padding:0 10px; font:600 11px -apple-system, "Helvetica Neue", Arial, sans-serif; flex:none; margin-top:2px; }
+  .foot { padding:8px 18px; font:400 9.5px -apple-system, "Helvetica Neue", Arial, sans-serif; color:var(--ter); }
+  .kb { position:absolute; left:0; right:0; bottom:0; height:182px; background:var(--control); opacity:.65; z-index:5; border-radius:0; }
+  .kb::after { content:"keyboard"; position:absolute; inset:0; display:grid; place-items:center; font:500 10px ui-monospace, Menlo, monospace; color:var(--sec); }
+
+  .refs { margin-top:48px; border-top:1px solid var(--rule); padding-top:20px; font-size:14px; color:#3b3934; }
+  .refs a { color:#2f6fd6; }
+  .refs li { margin:4px 0; }
+  .note { margin-top:28px; padding:14px 0 0; border-top:1px solid var(--rule); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="menu" viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="search" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="mic" viewBox="0 0 20 20"><rect x="7" y="2.5" width="6" height="10" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="up" viewBox="0 0 20 20"><path d="M10 16V4M5 9l5-5 5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="bubble" viewBox="0 0 20 20"><path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H9l-4 3v-3H4A1.5 1.5 0 0 1 2.5 13V6A1.5 1.5 0 0 1 4 4.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="ret" viewBox="0 0 20 20"><path d="M16 4v6a2 2 0 0 1-2 2H5M8 8.5L4.5 12 8 15.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+</svg>
+<main>
+  <h1>Ask anything: three ways in</h1>
+  <p>Today you reach Ask AI by swiping a word's card up. The card parks at the top and every question is about that word, grounded on its Wiktionary facts. These three shapes let you ask without a word. They are low-fi but use the app's own pieces: the grey card on the page, the round 64 pt buttons, the frameless centred composer and the model pill. Orange outlines mark what is new.</p>
+  <p>Your own probe results apply here. <b>Ungrounded, a small model inverts the meaning of rare words.</b> So any general answer that <i>names</i> words should look each one up in Wiktionary before showing it, and take its gloss from there. Concept C does this.</p>
+  <div class="bar"><button id="dark" class="on">Dark</button><button id="light">Light</button></div>
+
+  <!-- ───────── A ───────── -->
+  <section class="concept">
+    <div class="tag">A · LET GO OF THE WORD</div>
+    <h2>Inside today's Ask panel: a chip that unpins the word</h2>
+    <p>Nothing new to find. The panel you already pull up gets one chip, <b>obfuscate ✕</b>, beside the model pill. Tap ✕ and the word lets go: the parked card lifts away, the suggestions change, and the field says “Ask anything”.</p>
+    <div class="row">
+      <div class="step">
+        <div class="phone">
+          <div class="peek"></div>
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div style="height:70px"></div>
+          <div class="presets">
+            <div>How would I use it in conversation?</div>
+            <div>How is it different from its closest synonyms?</div>
+            <div>Give me three sentences that use it well.</div>
+            <div>Quiz me on it.</div>
+          </div>
+          <div class="composer">
+            <div class="field">Ask anything about this word</div>
+            <div class="controls">
+              <span class="pill">Apple (auto) <span class="chev">⌄</span></span>
+              <span class="pill word new">obfuscate <svg width="9" height="9"><use href="#x"/></svg></span>
+              <span style="flex:1"></span>
+              <span class="circle sm"><svg width="14" height="14"><use href="#mic"/></svg></span>
+              <span class="send"><svg width="14" height="14"><use href="#up"/></svg></span>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><b>1.</b> Today's panel, with one addition: the word is a chip in the controls row. It says what the AI is grounded on, and its ✕ removes that.</div>
+      </div>
+
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div style="height:70px"></div>
+          <div class="presets">
+            <div>Find me a word for…</div>
+            <div>Which fits better: <i>wry</i> or <i>sardonic</i>?</div>
+            <div>Make this sentence sharper</div>
+            <div>Quiz me on my Literary words</div>
+          </div>
+          <div class="composer">
+            <div class="field">Ask anything</div>
+            <div class="controls">
+              <span class="pill">Apple (auto) <span class="chev">⌄</span></span>
+              <span style="flex:1"></span>
+              <span class="circle sm"><svg width="14" height="14"><use href="#mic"/></svg></span>
+              <span class="send"><svg width="14" height="14"><use href="#up"/></svg></span>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><b>2.</b> Unpinned: the card's peek has gone up out of view, the chip is gone, and the suggestions turn general. Pulling down still closes, and the card comes back down.</div>
+      </div>
+
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div class="pad" style="padding-top:40px">
+            <div class="q">Which fits better: wry or sardonic?</div>
+            <div class="ans">
+              <p>Both are dry, mocking humour. <u>Wry</u> is gentle and often aimed at yourself; you smile while you say it.</p>
+              <p><u>Sardonic</u> has teeth: it is scornful, and aimed at someone else.</p>
+              <p>“A wry note about his own lateness.”<br>“A sardonic note about hers.”</p>
+            </div>
+          </div>
+          <div class="composer">
+            <div class="field">Ask a follow-up</div>
+            <div class="controls">
+              <span class="pill">Apple (auto) <span class="chev">⌄</span></span>
+              <span style="flex:1"></span>
+              <span class="circle sm"><svg width="14" height="14"><use href="#mic"/></svg></span>
+              <span class="send"><svg width="14" height="14"><use href="#up"/></svg></span>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><b>3.</b> The answer streams in as it does today. Words it names are drawn in ink with a dotted underline. Tap one and its card opens, with Add, from the word you tapped.</div>
+      </div>
+    </div>
+    <div class="pros">
+      <div>The smallest change, built on the panel and choreography you already have</div>
+      <div>Makes the grounding visible: the chip shows what the AI is using</div>
+      <div class="con">You can only ask generally after swiping up on some word</div>
+      <div class="con">It doesn't help the empty deck, the moment you have no word yet</div>
+    </div>
+  </section>
+
+  <!-- ───────── B ───────── -->
+  <section class="concept">
+    <div class="tag">B · A THIRD BUTTON</div>
+    <h2>Ask sits between Collections and Search</h2>
+    <p>AI becomes a front-door feature. A third round button opens the same Ask screen with no card above it. It grows out of the button and shrinks back into it.</p>
+    <div class="row">
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div class="caption">Literary · 3 of 6</div>
+          <div class="card" style="top:72px; height:380px">
+            <div class="w">obfuscate</div>
+            <div class="d">To make something deliberately unclear or hard to understand.</div>
+          </div>
+          <div class="bottombar">
+            <span class="circle"><svg width="18" height="18"><use href="#menu"/></svg></span>
+            <span class="circle new"><svg width="19" height="19"><use href="#bubble"/></svg></span>
+            <span class="circle"><svg width="18" height="18"><use href="#search"/></svg></span>
+          </div>
+        </div>
+        <div class="cap"><b>1.</b> The deck as today, with a third button in the middle.</div>
+      </div>
+
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div style="padding:6px 17px 0"><span class="circle sm"><svg width="12" height="12"><use href="#x"/></svg></span></div>
+          <div style="height:60px"></div>
+          <div class="presets">
+            <div>Find me a word for…</div>
+            <div>Which fits better: <i>wry</i> or <i>sardonic</i>?</div>
+            <div>Make this sentence sharper</div>
+            <div>Quiz me on my Literary words</div>
+          </div>
+          <div class="composer">
+            <div class="field">Ask anything</div>
+            <div class="controls">
+              <span class="pill">Apple (auto) <span class="chev">⌄</span></span>
+              <span style="flex:1"></span>
+              <span class="circle sm"><svg width="14" height="14"><use href="#mic"/></svg></span>
+              <span class="send"><svg width="14" height="14"><use href="#up"/></svg></span>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><b>2.</b> The general Ask: <code>AskView</code> with no word. The suggestions are about words in general, plus one about your own collection.</div>
+      </div>
+
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div style="padding:6px 17px 0"><span class="circle sm"><svg width="12" height="12"><use href="#x"/></svg></span></div>
+          <div class="pad" style="padding-top:18px">
+            <div class="q">Make this sharper: “The report was confusing on purpose.”</div>
+            <div class="ans">
+              <p>“The report was deliberately <u>obfuscated</u>.”</p>
+              <p>“Confusing on purpose” is what <u>obfuscate</u> means, so one word does the work of three. If you want blame in it, try “the report <u>muddied</u> the issue”.</p>
+              <p style="color:var(--ter); font-size:10.5px">obfuscate is in your Literary words · used it 1 time</p>
+            </div>
+          </div>
+          <div class="composer">
+            <div class="field">Ask a follow-up</div>
+            <div class="controls">
+              <span class="pill">Apple (auto) <span class="chev">⌄</span></span>
+              <span style="flex:1"></span>
+              <span class="circle sm"><svg width="14" height="14"><use href="#mic"/></svg></span>
+              <span class="send"><svg width="14" height="14"><use href="#up"/></svg></span>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><b>3.</b> A general question still feeds your vocabulary: when an answer uses a word you are learning, it says so. That counts as using the word in real life.</div>
+      </div>
+    </div>
+    <div class="pros">
+      <div>Clearly a “mode”, and easy to find</div>
+      <div>Works with an empty deck</div>
+      <div class="con">A third button crowds a deliberately quiet screen</div>
+      <div class="con">Two Ask screens (word / general) to keep apart in your head</div>
+    </div>
+  </section>
+
+  <!-- ───────── C ───────── -->
+  <section class="concept">
+    <div class="tag">C · SEARCH OR ASK</div>
+    <h2>One field: type a word and it searches, type a question and it asks</h2>
+    <p>When you don't have a word in mind you already go to Search, so the general Ask lives there. A single word works as today. Once you type a phrase or a question, the top row becomes <b>Ask</b>. The most useful general question in a vocab app is the reverse dictionary, “a word for …”. Its answer is a list of real words: each one is looked up in Wiktionary, its gloss comes from there, and each has Add.</p>
+    <div class="row">
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="search">
+              <span class="circle sm"><svg width="12" height="12"><use href="#x"/></svg></span>
+              <div class="sfield typed"><svg width="12" height="12" style="color:var(--sec)"><use href="#search"/></svg>petrichor</div>
+            </div>
+            <div class="list">
+              <div>petrichor</div><div>petrichors</div><div>petrichoric</div>
+            </div>
+          </div>
+          <div class="kb"></div>
+        </div>
+        <div class="cap"><b>1.</b> One word works exactly as today: Wiktionary suggestions. The placeholder changes to “Search a word or ask anything”.</div>
+      </div>
+
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="search">
+              <span class="circle sm"><svg width="12" height="12"><use href="#x"/></svg></span>
+              <div class="sfield typed"><svg width="12" height="12" style="color:var(--sec)"><use href="#search"/></svg>a word for missing a place you…</div>
+            </div>
+            <div class="list">
+              <div class="ask" style="box-shadow:inset 3px 0 0 #FF9F0A"><svg width="15" height="15" style="flex:none; margin-top:1px"><use href="#bubble"/></svg><span>Ask: “a word for missing a place you've never been”</span></div>
+              <div class="empty">No dictionary entries match.</div>
+            </div>
+          </div>
+          <div class="kb"></div>
+        </div>
+        <div class="cap"><b>2.</b> Three or more words, or a “?”, and the top row becomes Ask. Return sends it, so there is no mode to switch.</div>
+      </div>
+
+      <div class="step">
+        <div class="phone">
+          <div class="sb"><span>9:41</span><i></i></div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="search">
+              <span class="circle sm" style="transform:scaleX(-1)"><svg width="12" height="12"><use href="#ret"/></svg></span>
+              <div class="sfield typed">a word for missing a place you've never…</div>
+            </div>
+            <div class="cand"><div class="t"><b>hiraeth</b><span>Welsh. A homesick longing for a home you can't return to, or that never was.</span></div><span class="add"><svg width="9" height="9"><use href="#plus"/></svg>Add</span></div>
+            <div class="cand"><div class="t"><b>fernweh</b><span>German. An ache for distant places; the opposite of homesickness.</span></div><span class="add"><svg width="9" height="9"><use href="#plus"/></svg>Add</span></div>
+            <div class="cand"><div class="t"><b>saudade</b><span>Portuguese. A melancholy longing for something absent, perhaps never had.</span></div><span class="add"><svg width="9" height="9"><use href="#plus"/></svg>Add</span></div>
+            <div class="ans" style="padding:4px 18px 0; font-size:11px">The closest fit is <u>hiraeth</u>. <u>Fernweh</u> is about wanting to go, not missing.</div>
+            <div class="foot">Words suggested by Apple Intelligence · definitions from Wiktionary</div>
+            <div class="composer" style="bottom:16px">
+              <div class="controls">
+                <span class="pill">Apple (auto) <span class="chev">⌄</span></span>
+                <span style="flex:1"></span>
+                <span class="pill">Ask a follow-up</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap"><b>3.</b> The model only <i>proposes</i> words. Each one is checked in Wiktionary, and the gloss is Wiktionary's, so an invented or inverted meaning can't get in. Tap a word for its full card, or Add.</div>
+      </div>
+    </div>
+    <div class="pros">
+      <div>No new button or mode: Search simply understands questions</div>
+      <div>The reverse dictionary is the general question this app can answer best</div>
+      <div>It keeps your grounding rule: the model proposes, the dictionary decides</div>
+      <div class="con">Telling a word from a question needs a rule (word count, “?”, a lead-in like “word for”)</div>
+      <div class="con">Free-form questions with no words in the answer fit the sheet less well</div>
+    </div>
+  </section>
+
+  <div class="note">
+    <h2>If I had to pick</h2>
+    <p><b>C, plus A's chip.</b> C is where you already go without a word in mind, and its answer shape (real words, checked, with Add) is exactly the app's job. A's ✕ chip covers the other road in: you are on a word and the question drifts wider. Both reuse <code>AskView</code>'s streaming and choreography. Only the prompt changes: no <code>DICTIONARY FACTS</code> block, plus a structured “candidate words” output that the app checks against Wiktionary.</p>
+    <p>B is worth it only if AI should be the headline of the app rather than a tool inside it.</p>
+  </div>
+
+  <div class="refs">
+    <b>References (Mobbin)</b>
+    <ul>
+      <li><a href="https://mobbin.com/screens/985323ca-d9af-4593-83ad-ef1cd24fc5a8">Evernote, Standard / AI-Powered search</a>: one search field with AI as a second kind of result. Closest to C, which drops the toggle.</li>
+      <li><a href="https://mobbin.com/screens/67f313e1-f28b-4620-b907-4cba426ff22b">Google, AI Mode</a>: “Ask anything” beside ordinary search tabs.</li>
+      <li><a href="https://mobbin.com/screens/3762e7f0-1b4c-4182-b6e8-1a112542e325">Matter, Co-Reader</a>: context chips above the field that widen or narrow the question. The idea behind A's chip.</li>
+      <li><a href="https://mobbin.com/screens/6820bde5-a6b5-490d-a172-8cb16463f97b">ElevenReader, Ask me anything</a>: a full-screen general ask. Closest to B.</li>
+      <li><a href="https://mobbin.com/screens/14b98ef6-7762-4b0f-81cb-67d523910daf">Vrbo, Ask a question</a>: an answer that names its source, like C's Wiktionary footnote.</li>
+    </ul>
+  </div>
+</main>
+<script>
+  const d = document.getElementById('dark'), l = document.getElementById('light');
+  d.onclick = () => { document.body.classList.remove('light'); d.classList.add('on'); l.classList.remove('on'); };
+  l.onclick = () => { document.body.classList.add('light'); l.classList.add('on'); d.classList.remove('on'); };
+</script>
+</body>
+</html>

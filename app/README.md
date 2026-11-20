@@ -13,6 +13,10 @@ synced folder, so new files added in Xcode need no regeneration. Edit `project.y
 
 Debug launch arguments: `-seedDemo` fetches six literary words into a "Literary" collection
 on first launch; `-demo search|ask|study|collections` opens that screen.
+`-hitchLog` prints main-thread CPU per frame (worst frame of each card throw, and of every
+2 s window) to stdout; run with `xcrun simctl launch --console-pty` to compare motion changes.
+`-layerDump` prints, every 0.3 s, how many Core Animation layers carry a blur filter, a mask
+or group opacity (the effects that cost offscreen render passes).
 
 ## Gestures
 Deck: ← → move between cards · ↓ search · ↑ ask AI about this word
@@ -26,7 +30,7 @@ Study (per collection; front shows the meaning, tap to reveal the word):
   download in Settings is not built yet.
 - FSRS-4.5 scheduler (`FSRS.swift`)
 - AI mode: one `Explainer` interface with three engines: Apple Foundation Models
-  (on-device), OpenCode Zen (debug builds only, key entered in Settings), and templates.
+  (on-device), Groq free tier (debug builds only, key entered in Settings), and templates.
 
 ## Branches
 Work happens on `dev`; merge to `main` when it is ready.

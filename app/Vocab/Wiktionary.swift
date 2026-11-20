@@ -73,8 +73,34 @@ enum Wiktionary {
         for (entity, char) in ["&amp;": "&", "&quot;": "\"", "&#39;": "'", "&nbsp;": " ", "&lt;": "<", "&gt;": ">"] {
             s = s.replacingOccurrences(of: entity, with: char)
         }
+        s = decodeNumericEntities(s).replacingOccurrences(of: "\u{200E}", with: "")
         return s.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+extension Wiktionary {
+    /// "&#42;" and "&#x2A;" to "*".
+    nonisolated static func decodeNumericEntities(_ s: String) -> String {
+        guard s.contains("&#") else { return s }
+        var out = "", rest = Substring(s)
+        while let amp = rest.range(of: "&#") {
+            out += rest[..<amp.lowerBound]
+            let after = rest[amp.upperBound...]
+            if let semi = after.firstIndex(of: ";"), after.distance(from: after.startIndex, to: semi) <= 8 {
+                let body = after[..<semi]
+                let value = body.first == "x" || body.first == "X"
+                    ? UInt32(body.dropFirst(), radix: 16) : UInt32(body)
+                if let value, let scalar = Unicode.Scalar(value) {
+                    out.unicodeScalars.append(scalar)
+                    rest = after[after.index(after: semi)...]
+                    continue
+                }
+            }
+            out += "&#"
+            rest = after
+        }
+        return out + rest
     }
 }
 

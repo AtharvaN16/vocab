@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word Pills</title>
+<style>
+  :root {
+    --page: #f4f4f4; --card: #eaeaea; --control: #e6e6e6; --sheet: #fff;
+    --ink: #111; --ink2: #8a8a8a; --line: #dcdcdc; --canvas: #fafafa;
+    --btnTop: #fff; --btnBot: #f1f1f1; --btnEdge: rgba(0,0,0,.14); --btnLow: rgba(0,0,0,.06); --btnDrop: rgba(0,0,0,.14); --sheen: rgba(0,0,0,.07);
+    --pctBg: rgba(44,44,44,.78); --hi: rgba(255,255,255,.85); --glass: rgba(255,255,255,.42);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #000; --card: #1c1c1c; --control: #292929; --sheet: #141414;
+      --ink: #f2f2f2; --ink2: #8d8d8d; --line: #333; --canvas: #0d0d0d;
+      --btnTop: #3b3b3b; --btnBot: #2c2c2c; --btnEdge: rgba(255,255,255,.07); --btnLow: rgba(0,0,0,.35); --btnDrop: rgba(0,0,0,.6); --sheen: rgba(255,255,255,.12);
+      --pctBg: rgba(78,78,78,.85); --hi: rgba(255,255,255,.16); --glass: rgba(20,20,20,.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #000; --card: #1c1c1c; --control: #292929; --sheet: #141414;
+    --ink: #f2f2f2; --ink2: #8d8d8d; --line: #333; --canvas: #0d0d0d;
+    --btnTop: #3b3b3b; --btnBot: #2c2c2c; --btnEdge: rgba(255,255,255,.07); --btnLow: rgba(0,0,0,.35); --btnDrop: rgba(0,0,0,.6); --sheen: rgba(255,255,255,.12);
+    --pctBg: rgba(78,78,78,.85); --hi: rgba(255,255,255,.16); --glass: rgba(20,20,20,.45);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--canvas); color: var(--ink); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; padding: 40px 16px 80px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .lede { color: var(--ink2); max-width: 680px; margin-top: 8px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink2); margin: 52px 0 6px; font-weight: 600; }
+  .sub { color: var(--ink2); margin-bottom: 20px; max-width: 680px; }
+
+  /* Controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-top: 22px; font-size: 13px; color: var(--ink2); }
+  .btn { appearance: none; border: 0; font: inherit; font-weight: 600; color: var(--ink); background: var(--control); height: 32px; padding: 0 14px; border-radius: 16px; cursor: pointer; transition: transform .16s ease-out; }
+  .btn:active { transform: scale(.96); }
+  .seg { display: inline-flex; background: var(--control); border-radius: 16px; padding: 3px; }
+  .seg button { appearance: none; border: 0; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink2); background: none; height: 26px; padding: 0 11px; border-radius: 13px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--sheet); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  label.ctl { display: inline-flex; gap: 8px; align-items: center; }
+  input[type=range] { width: 110px; accent-color: var(--ink); }
+
+  .row { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; margin-top: 8px; }
+  figure { width: 320px; max-width: 100%; }
+  figcaption { margin-top: 14px; font-size: 13px; color: var(--ink2); }
+  figcaption .k { color: var(--ink); font-weight: 600; }
+  figcaption > b { color: var(--ink); display: block; font-size: 14px; margin-bottom: 2px; }
+
+  /* Phone */
+  .phone { width: 320px; max-width: 100%; height: 660px; border-radius: 44px; border: 1.5px solid var(--line); background: var(--page); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .status { height: 40px; display: flex; justify-content: space-between; align-items: center; padding: 0 28px; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .status i { width: 50px; height: 9px; border-radius: 5px; background: var(--line); display: block; }
+  .home { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 110px; height: 4px; border-radius: 2px; background: var(--ink); opacity: .8; z-index: 9; }
+
+  .peek { margin: 4px 14px 0; height: 54px; border-radius: 22px 22px 0 0; background: var(--card); padding: 14px 20px 0; font-size: 22px; font-weight: 700; flex-shrink: 0; }
+  .panel { flex: 1; min-height: 0; background: var(--sheet); border-radius: 28px 28px 0 0; margin-top: -6px; display: flex; flex-direction: column; position: relative; box-shadow: 0 -1px 0 var(--line); }
+  .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 6px; flex-shrink: 0; }
+  .scroll { flex: 1; min-height: 0; overflow: hidden; padding: 6px 20px 0; }
+
+  .q { margin: 8px 0 14px auto; width: fit-content; max-width: 85%; background: var(--control); padding: 9px 14px; border-radius: 20px; font-size: 15px; font-weight: 500; }
+  .answer { font-size: 16.5px; line-height: 1.72; letter-spacing: -0.005em; }
+  .answer p + p { margin-top: 12px; }
+
+  .composer { flex-shrink: 0; margin: 8px 12px 26px; height: 44px; border-radius: 22px; background: var(--control); display: flex; align-items: center; padding: 0 6px 0 16px; color: var(--ink2); font-size: 15px; }
+  .composer .send { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: var(--page); display: grid; place-items: center; }
+  .composer .send svg { width: 14px; height: 14px; }
+
+  /* Search phone */
+  .shead { display: flex; gap: 8px; align-items: center; padding: 2px 14px 12px; flex-shrink: 0; }
+  .cbtn { width: 38px; height: 38px; border-radius: 50%; background: var(--control); display: grid; place-items: center; flex-shrink: 0; }
+  .cbtn svg { width: 15px; height: 15px; }
+  .field { flex: 1; min-width: 0; height: 40px; border-radius: 20px; background: var(--control); display: flex; align-items: center; padding: 0 13px; gap: 7px; font-size: 14.5px; white-space: nowrap; overflow: hidden; }
+  .field svg { width: 14px; height: 14px; color: var(--ink2); flex-shrink: 0; }
+  .lbl { display: flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: .06em; margin: 4px 0 6px; }
+  .lbl svg { width: 13px; height: 13px; }
+  .srow { padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+  .srow em { font-style: normal; font-weight: 400; color: var(--ink2); font-size: 13px; display: block; }
+  .results { margin-top: 18px; }
+
+  /* Streamed words: same word-by-word fade the app's Ask answer uses */
+  .tok { opacity: 0; transition: opacity .28s ease-out; }
+  .tok.in { opacity: 1; }
+
+  /* ───────────── The pill ───────────── */
+  .pill {
+    --t: #7c5cff;
+    position: relative; display: inline-flex; align-items: center; gap: 5px;
+    height: 26px; padding: 0 10px 0 4px; margin: 0 1px; border-radius: 13px;
+    vertical-align: -1px; line-height: 1;
+    font: 650 15px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; letter-spacing: -0.01em;
+    color: #fff; text-shadow: 0 -0.5px 0 rgba(0,0,0,.18);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--t) 70%, #fff), var(--t) 70%);
+    border: 0; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    box-shadow:
+      inset 0 0 0 0.5px rgba(0,0,0,.14),
+      inset 0 1px 0 rgba(255,255,255,.38),
+      inset 0 -1px 0 rgba(0,0,0,.16),
+      0 1px 1px var(--btnDrop),
+      0 2px 3px -1px var(--btnDrop);
+    transition: transform .2s cubic-bezier(.2,0,0,1), box-shadow .2s ease-out, background .3s ease-out, color .3s ease-out;
+    overflow: hidden; isolation: isolate;
+  }
+  .pill .plus {
+    transition: background .25s ease-out, box-shadow .25s ease-out;
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; position: relative;
+    background: rgba(255,255,255,.24);
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,.3);
+    color: #fff; display: grid; place-items: center;
+  }
+  .pill .plus svg { width: 10px; height: 10px; grid-area: 1/1; transition: transform .25s cubic-bezier(.2,0,0,1), opacity .18s ease-out; }
+  .pill .plus .ic-check { opacity: 0; transform: scale(.5); }
+  .pill .plus .ic-check path { stroke-dasharray: 14; stroke-dashoffset: 14; transition: stroke-dashoffset .3s cubic-bezier(.2,0,0,1) .08s; }
+
+  /* Pop in when the streamed answer reaches it */
+  .pill.tok { opacity: 0; transform: scale(.86); filter: blur(4px); transition: opacity .3s ease-out, transform .42s cubic-bezier(.34,1.4,.64,1), filter .3s ease-out, box-shadow .2s ease-out, background .3s, color .3s; }
+  .pill.tok.in { opacity: 1; transform: none; filter: none; }
+
+  /* Pressed: the key goes down */
+  .pill.pressed, .pill.static-pressed {
+    transform: translateY(1px) scale(.95) !important;
+    background: color-mix(in oklab, var(--t) 90%, #000);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(0,0,0,.2),
+      inset 0 1px 2px rgba(0,0,0,.28),
+      0 0 0 rgba(0,0,0,0);
+    transition-duration: .1s;
+  }
+
+  /* Making the card: the pill just stays held down, like PressStyle(held: true). No animation of its own. */
+  .pill[data-state="generating"] {
+    cursor: default; transform: translateY(1px) scale(.95);
+    background: color-mix(in oklab, var(--t) 90%, #000);
+    box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.2), inset 0 1px 2px rgba(0,0,0,.28);
+  }
+
+  /* Added: flat, no longer a button — it's in the deck now */
+  .pill[data-state="added"] {
+    cursor: default;
+    background: var(--control);
+    box-shadow: none; text-shadow: none;
+    color: var(--ink2);
+  }
+  .pill[data-state="added"] .ic-plus { opacity: 0; transform: scale(.4); }
+  .pill[data-state="added"] .ic-check { opacity: 1; transform: none; }
+  .pill[data-state="added"] .ic-check path { stroke-dashoffset: 0; }
+  .pill[data-state="added"] .plus { box-shadow: none; background: color-mix(in oklab, var(--t) 70%, var(--control)); }
+
+  /* ───────────── Add pill: save an example sentence ───────────── */
+  /* A neutral raised key: white in light mode, grey in dark. */
+  .pill.addp {
+    --t: var(--ink2);
+    color: var(--ink); text-shadow: none; margin-left: 3px; padding-right: 11px;
+    background: linear-gradient(180deg, var(--btnTop), var(--btnBot));
+    box-shadow:
+      inset 0 0 0 0.5px var(--btnEdge),
+      inset 0 1px 0 var(--hi),
+      inset 0 -1px 0 var(--btnLow),
+      0 1px 1px var(--btnDrop),
+      0 2px 3px -1px var(--btnDrop);
+  }
+  .pill.addp .plus { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); box-shadow: none; }
+  .pill.addp.pressed, .pill.addp.static-pressed, .pill.addp[data-state="generating"] {
+    background: var(--btnBot);
+    box-shadow: inset 0 0 0 0.5px var(--btnEdge), inset 0 1px 2px var(--btnDrop);
+  }
+  .pill.addp[data-state="added"] { color: var(--ink2); background: var(--control); box-shadow: none; }
+  .pill.addp[data-state="added"] .plus { background: var(--ink2); color: var(--page); }
+
+  .answer.ex { counter-reset: ex; }
+  .answer.ex p { counter-increment: ex; position: relative; padding-left: 24px; }
+  .answer.ex p::before { content: counter(ex); position: absolute; left: 0; top: 0; font-size: 13px; font-weight: 700; color: var(--ink2); line-height: 2.2; }
+  .answer.ex p + p { margin-top: 14px; }
+
+  /* ───────────── The card that forms ─────────────
+     Technique from Bencho's "Generate" block (MIT): one SVG filter over the card,
+     three windows — SHAPES (blur 20px, contrast 2.4 about the paper), FORM (blur
+     lets go, contrast eases back, a drifting ripple stills), GRAIN (the sharp card
+     arrives over the last 30%). A count climbs on its own uneven curve. */
+  .forming {
+    position: absolute; left: 12px; right: 12px; bottom: 82px; z-index: 6;
+    height: 206px; border-radius: 22px; overflow: hidden; clip-path: inset(0 round 22px);
+    background: var(--card);
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,.35), 0 0 0 0.5px var(--line);
+    opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: opacity .2s ease-in, transform .2s ease-in;
+  }
+  .forming.show { opacity: 1; transform: none; transition: opacity .22s ease-out, transform .32s cubic-bezier(.2,0,0,1); }
+  .forming .layer { position: absolute; inset: 0; padding: 18px 22px 48px; background: var(--card); }
+  .forming .pct {
+    position: absolute; left: 12px; bottom: 12px; height: 24px; padding: 0 10px; border-radius: 12px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    font: 600 12.5px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    color: #fff; background: var(--pctBg); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  }
+  .forming .pct svg { width: 10px; height: 10px; }
+  .forming .w { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; margin-top: 8px; }
+  .forming .pos { font-size: 13px; font-weight: 500; color: var(--ink2); margin-top: 2px; }
+  .forming.ex { height: 214px; }
+  .forming.ex .w { font-size: 26px; margin-top: 6px; }
+  .forming.ex .pos { display: none; }
+  .forming.ex .d { font-size: 16.5px; font-weight: 500; font-style: italic; color: var(--ink); line-height: 1.35; margin-top: 8px; }
+  .forming.ex .d::before { content: "Examples"; display: block; font-style: normal; font-size: 12px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+  .forming .d { font-size: 19px; font-weight: 700; color: var(--ink2); margin-top: 6px; line-height: 1.25; }
+
+  /* States strip */
+  .states { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+  .state { background: var(--sheet); border: 1px solid var(--line); border-radius: 20px; padding: 22px 20px 16px; min-width: 150px; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+  .state small { font-size: 12.5px; color: var(--ink2); line-height: 1.35; }
+  .state small b { display: block; color: var(--ink); font-size: 13.5px; }
+  .palette { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+  .notes { margin-top: 14px; max-width: 680px; color: var(--ink2); font-size: 14px; }
+  .notes li { margin: 6px 0 0 18px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pill.tok, .tok { transition: opacity .2s; transform: none; filter: none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs id="defs"></defs>
+</svg>
+
+<div class="wrap">
+  <h1>Word pills in AI answers</h1>
+  <p class="lede">When an answer in <b>Ask</b> or <b>Search</b> mentions a word that isn't in your deck, it's shown as a raised, coloured button with a +. <b>Tap it</b> and the card is generated in place, the way Bencho’s <i>Generate</i> works: dark blurred shapes first, then edges, then fine detail, with a percentage counting up in the corner. The pill stays held down while it works, then flattens with a tick.</p>
+
+  <div class="controls">
+    <button class="btn" id="replay">Replay answers</button>
+    <span class="seg" id="theme" role="group" aria-label="Appearance">
+      <button data-v="system" aria-pressed="true">System</button>
+      <button data-v="light" aria-pressed="false">Light</button>
+      <button data-v="dark" aria-pressed="false">Dark</button>
+    </span>
+    <label class="ctl">Pace <input type="range" id="pace" min="2" max="5" step="0.5" value="3"> <span id="paceV">3.0s</span></label>
+    <label class="ctl">Ripple <input type="range" id="ripple" min="0" max="100" value="50"></label>
+    <label class="ctl"><input type="checkbox" id="slow"> Slow motion ×4</label>
+  </div>
+
+  <h2>Try it</h2>
+  <p class="sub">Tap any pill. Words already in your deck are shown as lowered pills with a tick (<i>succinct</i> on the right).</p>
+
+  <div class="row">
+    <figure>
+      <div class="phone" id="ask">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="peek">laconic</div>
+        <div class="panel">
+          <div class="grab"></div>
+          <div class="scroll">
+            <div class="q">How is it different from its closest synonyms?</div>
+            <div class="answer" data-src="ask"></div>
+          </div>
+          <div class="composer">Ask a follow-up…<span class="send"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></span></div>
+        </div>
+        <div class="forming" aria-live="polite"></div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Ask AI (chat)</b>Answer about <i>laconic</i>, streaming in word by word. Pills pop in as they arrive.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone" id="search">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="shead">
+          <span class="cbtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 3 5 8l5 5"/></svg></span>
+          <span class="field"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>saying a lot in few words</span>
+        </div>
+        <div class="scroll" style="padding-top:0">
+          <div class="lbl"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5c.4 2.9 1.6 4.1 4.5 4.5-2.9.4-4.1 1.6-4.5 4.5C7.6 7.6 6.4 6.4 3.5 6 6.4 5.6 7.6 4.4 8 1.5Zm4.5 8c.2 1.4.8 2 2 2.2-1.2.2-1.8.8-2 2.3-.2-1.5-.8-2.1-2.2-2.3 1.4-.2 2-.8 2.2-2.2Z"/></svg>AI answer</div>
+          <div class="answer" data-src="search"></div>
+          <div class="results">
+            <div class="lbl">Dictionary</div>
+            <div class="srow">pithy<em>Brief, forceful and full of meaning</em></div>
+            <div class="srow">compendious<em>Containing much in brief form</em></div>
+            <div class="srow">epigrammatic<em>Concise, clever and amusing</em></div>
+          </div>
+        </div>
+        <div class="forming" aria-live="polite"></div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Search with AI answer</b>Same pills inside the AI answer above the dictionary results.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone" id="examples">
+        <div class="status"><span>9:41</span><i></i></div>
+        <div class="peek">laconic</div>
+        <div class="panel">
+          <div class="grab"></div>
+          <div class="scroll">
+            <div class="q">Give me three sentences that use it well.</div>
+            <div class="answer ex" data-src="examples"></div>
+          </div>
+          <div class="composer">Ask a follow-up…<span class="send"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg></span></div>
+        </div>
+        <div class="forming ex" aria-live="polite"></div>
+        <div class="home"></div>
+      </div>
+      <figcaption><b>Example sentences</b>A raised grey <span class="k">+ Add</span> pill ends each sentence. Tapping it saves the sentence to the word’s detail page under Examples.</figcaption>
+    </figure>
+  </div>
+
+  <h2>States</h2>
+  <p class="sub">One pill, four states. Each new word gets its own colour from a fixed set, so neighbouring pills never share one.</p>
+  <div class="states" id="states"></div>
+  <div class="palette" id="palette"></div>
+  <p class="sub" style="margin-top:28px">Example sentences use a neutral raised pill instead: white in light mode, grey in dark, so it never competes with the coloured word pills.</p>
+  <div class="states" id="inkStates"></div>
+
+  <h2>Notes for the SwiftUI build</h2>
+  <ul class="notes">
+    <li><b>Pill:</b> a <code>Capsule</code> with a solid colour fill (lighter at the top), white text, a 1&nbsp;pt highlight inset at the top, a darker bottom edge and a tight, neutral drop shadow, like a key. No coloured glow. When pressed it scales to 0.95 and moves down 1&nbsp;pt, matching the existing <code>PressStyle</code>.</li>
+    <li><b>Inline in text:</b> SwiftUI <code>Text</code> can't hold views. Either lay out the tokens with a flow <code>Layout</code> (each word is a view, so you get real buttons), or render the answer as <code>AttributedString</code> and draw the pills over the measured runs. A flow layout is simpler and works with VoiceOver.</li>
+    <li><b>Forming card (after Bencho’s Generate):</b> over the whole run <i>t</i>, three overlapping windows. <i>Shapes</i>: blur 20&nbsp;pt and contrast 2.4 (pivoting on the card’s paper colour, so the ground holds and the ink deepens). <i>Form</i> (t 0.1→0.82): blur falls to 1.6 on a <code>1−(1−form)^2.2</code> curve, contrast eases to 1, and a noise ripple of <code>32·ripple·(1−t)^1.5</code> stills. <i>Grain</i> (t 0.7→1): the sharp card fades in on top. The % climbs on an uneven, re-rolled curve, caps at 99 until the card lands, then holds 100 for 0.65&nbsp;s. In SwiftUI: <code>TimelineView</code> driving <code>.blur</code>, <code>.contrast</code> and a Metal <code>.distortionEffect</code>; the filter only exists during the run.</li>
+    <li><b>Add pill:</b> same shape and press behaviour, as a neutral key (white / grey). It appends the sentence to the word’s examples (shown on <code>WordDetailView</code>), and a word pill inside the same sentence still works on its own.</li>
+    <li><b>Reduce Motion:</b> no blur or ripple; the card fades in already sharp over 0.4&nbsp;s and the count still runs.</li>
+    <li><b>Haptics:</b> light impact on press, success notification when the tick appears.</li>
+  </ul>
+</div>
+
+<script>
+const PALETTE = ['#7a3cff', '#ff4b1f', '#00b37e', '#ff9500', '#0a7cff', '#ff2d6f'];
+const WORDS = {
+  terse:      ['adjective', 'Sparing in words; abrupt.'],
+  pithy:      ['adjective', 'Brief, forceful and full of meaning.'],
+  taciturn:   ['adjective', 'Habitually reserved in speech; saying little.'],
+  reticent:   ['adjective', 'Not revealing one’s thoughts readily.'],
+  loquacious: ['adjective', 'Tending to talk a great deal.'],
+  succinct:   ['adjective', 'Briefly and clearly expressed.'],
+  aphoristic: ['adjective', 'Put in short, memorable statements of truth.'],
+  sententious:['adjective', 'Given to pompous moralizing.'],
+  laconic:    ['adjective', 'Using very few words.'],
+};
+const ANSWERS = {
+  ask: [
+    'Laconic means using very few words, usually by choice rather than rudeness. Its nearest neighbours are [terse] and [pithy]: terse leans abrupt, pithy leans clever.',
+    'Someone [taciturn] says little as a habit, while a [reticent] person holds back what they think. The opposite of all of them is [loquacious].'
+  ],
+  examples: [
+    'Her laconic reply, a single “Fine,” told him more than any speech could have. {{add}}',
+    'The coach was famously laconic, praising players with nothing more than a nod. {{add}}',
+    'His emails were so laconic that new colleagues often mistook them for anger. {{add}}'
+  ],
+  search: [
+    'You’re probably after [pithy]: brief but full of meaning. {succinct} stresses clarity without waste, [aphoristic] describes speech packed into maxims, and [sententious] is that quality tipping into preachiness.'
+  ],
+};
+
+const svgPlus = '<svg class="ic-plus" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 1.5v7M1.5 5h7"/></svg>';
+const svgCheck = '<svg class="ic-check" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.3 4.1 7.3 8 2.8"/></svg>';
+
+function addHTML(sentence, state = 'new', extra = '') {
+  return `<button class="pill addp ${extra}" data-word="laconic" data-sentence="${encodeURIComponent(sentence)}" data-state="${state}" aria-label="Add this sentence to laconic’s examples">` +
+         `<span class="plus">${svgPlus}${svgCheck}</span><span class="t">${state === 'added' ? 'Added' : 'Add'}</span></button>`;
+}
+
+function pillHTML(word, color, state = 'new', extra = '') {
+  return `<button class="pill ${extra}" style="--t:${color}" data-word="${word}" data-state="${state}" aria-label="${state === 'added' ? word + ', in your deck' : 'Add ' + word + ' to deck'}">` +
+         `<span class="plus">${svgPlus}${svgCheck}</span>${word}</button>`;
+}
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speed = () => document.getElementById('slow').checked ? 4 : 1;
+let timers = [];
+
+function build(container, key) {
+  let colorIdx = 0;
+  container.innerHTML = ANSWERS[key].map(p => {
+    const parts = p.split(/(\{\{add\}\}|\[[^\]]+\]|\{[^}]+\})/).filter(Boolean);
+    const sentence = p.replace(' {{add}}', '');
+    return '<p>' + parts.map(part => {
+      if (part === '{{add}}') return addHTML(sentence, 'new', 'tok');
+      if (part[0] === '[') return pillHTML(part.slice(1, -1), PALETTE[colorIdx++ % PALETTE.length], 'new', 'tok');
+      if (part[0] === '{') return pillHTML(part.slice(1, -1), PALETTE[colorIdx++ % PALETTE.length], 'added', 'tok');
+      return part.split(/(\s+)/).map(w => w.trim() ? `<span class="tok">${w}</span>` : w).join('');
+    }).join('') + '</p>';
+  }).join('');
+  container.querySelectorAll('.tok').forEach((el, i) => {
+    timers.push(setTimeout(() => el.classList.add('in'), (350 + i * 55) * (reduceMotion ? 0 : speed())));
+  });
+}
+
+function replay() {
+  timers.forEach(clearTimeout); timers = [];
+  document.querySelectorAll('.answer').forEach(a => build(a, a.dataset.src));
+  document.querySelectorAll('.forming').forEach(f => { cancelAnimationFrame(f._raf); clearTimeout(f._hold); clearTimeout(f._hide); f._busy = false; f.classList.remove('show'); });
+}
+
+// Press feedback
+document.addEventListener('pointerdown', e => {
+  const p = e.target.closest('.answer .pill[data-state="new"]');
+  if (p) p.classList.add('pressed');
+});
+document.addEventListener('pointerup', () => document.querySelectorAll('.pill.pressed').forEach(p => p.classList.remove('pressed')));
+document.addEventListener('pointercancel', () => document.querySelectorAll('.pill.pressed').forEach(p => p.classList.remove('pressed')));
+document.addEventListener('click', e => {
+  const p = e.target.closest('.answer .pill');
+  if (p && p.dataset.state === 'new' && !p.closest('.phone').querySelector('.forming')._busy) generate(p, p.closest('.phone'));
+});
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const mix = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+
+// The count keeps its own time: quick start, slow stretch, burst, stall, burst, crawl. Re-rolled every run.
+const rnd = (a, b) => a + Math.random() * (b - a);
+const knots = () => [[0, 0], [rnd(.1, .16), rnd(.1, .16)], [rnd(.32, .38), rnd(.22, .3)], [rnd(.44, .49), rnd(.5, .6)],
+                     [rnd(.56, .61), rnd(.62, .68)], [rnd(.68, .72), rnd(.84, .88)], [1, 1]];
+const along = (ks, t) => {
+  for (let i = 1; i < ks.length; i++) {
+    const [t0, v0] = ks[i - 1], [t1, v1] = ks[i];
+    if (t > t1) continue;
+    const u = clamp((t - t0) / (t1 - t0), 0, 1);
+    return mix(v0, v1, mix(u, u * u * (3 - 2 * u), .5));
+  }
+  return 1;
+};
+
+// One filter per phone: liquid ripple → blur → contrast about the paper.
+document.getElementById('defs').innerHTML = ['ask', 'search', 'examples'].map(id => `
+  <filter id="gen-${id}" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.0078" numOctaves="2" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feGaussianBlur in="d" stdDeviation="20"/>
+    <feComponentTransfer>
+      <feFuncR type="linear" slope="1" intercept="0"/><feFuncG type="linear" slope="1" intercept="0"/><feFuncB type="linear" slope="1" intercept="0"/>
+    </feComponentTransfer>
+  </filter>`).join('');
+
+// The card's paper as a luminance; contrast turns about this, not mid-grey.
+const paperOf = el => { const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g); return m ? (.2126 * m[0] + .7152 * m[1] + .0722 * m[2]) / 255 : .9; };
+const svgTick = '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.3 4.1 7.3 8 2.8"/></svg>';
+
+function generate(pill, phone) {
+  const isAdd = pill.classList.contains('addp');
+  const word = pill.dataset.word;
+  const [pos, def] = WORDS[word] || ['', ''];
+  const sentence = isAdd ? decodeURIComponent(pill.dataset.sentence) : '';
+  const card = phone.querySelector('.forming');
+  const fid = 'gen-' + phone.id, f = document.getElementById(fid);
+  const turb = f.querySelector('feTurbulence'), disp = f.querySelector('feDisplacementMap'), gblur = f.querySelector('feGaussianBlur');
+  const funcs = f.querySelectorAll('feFuncR, feFuncG, feFuncB');
+  const ripple = clamp(+document.getElementById('ripple').value, 0, 100) / 100;
+
+  clearTimeout(card._hide); clearTimeout(card._hold); cancelAnimationFrame(card._raf);
+  card._busy = true;
+  pill.dataset.state = 'generating';
+  const body = isAdd
+    ? `<div class="w">laconic</div><div class="d">${sentence}</div>`
+    : `<div class="w">${word}</div><div class="pos">${pos}</div><div class="d">${def}</div>`;
+  // It starts empty: a plain card of paper, then the picture is made on it.
+  card.innerHTML = `<div class="layer haze" style="opacity:0;filter:url(#${fid})">${body}</div>` +
+                   `<div class="layer sharp" style="opacity:0">${body}</div><span class="pct">0%</span>`;
+  card.classList.add('show');
+  const haze = card.querySelector('.haze'), sharp = card.querySelector('.sharp'), pct = card.querySelector('.pct');
+  const PAPER = paperOf(card);
+  const pace = +document.getElementById('pace').value;
+  const total = (reduceMotion ? 400 : pace * 1000) * speed();
+  const ks = knots();
+  let t0 = 0;
+
+  const tick = now => {
+    if (!t0) t0 = now;
+    const t = Math.min(1, (now - t0) / total);
+    if (reduceMotion) {
+      sharp.style.opacity = t;
+    } else {
+      const hz = smooth(0, .3, t), form = smooth(.1, .82, t), grain = smooth(.7, 1, t);
+      const sd = mix(20, 1.6, 1 - Math.pow(1 - form, 2.2));   // falls fast, then crawls through the small radii
+      const k = mix(2.4, 1, form);                              // shapes first: contrast makes them masses, not fog
+      const warp = ripple * 32 * Math.pow(1 - smooth(.05, .9, t), 1.5);
+      const fq = .006 + .0018 * Math.sin(t * 4.4);              // the water drifts rather than sitting still
+      turb.setAttribute('baseFrequency', `${fq.toFixed(4)} ${(fq * 1.3).toFixed(4)}`);
+      disp.setAttribute('scale', warp.toFixed(2));
+      gblur.setAttribute('stdDeviation', sd.toFixed(2));
+      funcs.forEach(fn => { fn.setAttribute('slope', k.toFixed(3)); fn.setAttribute('intercept', (PAPER - PAPER * k).toFixed(3)); });
+      haze.style.opacity = hz * mix(.7, 1, form);
+      haze.style.transform = `scale(${mix(1.04, 1, smooth(0, .9, t)).toFixed(4)})`;
+      sharp.style.opacity = grain;
+      sharp.style.filter = `blur(${mix(1.6, 0, grain).toFixed(2)}px)`;
+    }
+    pct.textContent = Math.min(99, Math.floor(along(ks, t) * 100)) + '%';   // 100 belongs to the card landing
+    if (t < 1) { card._raf = requestAnimationFrame(tick); return; }
+
+    haze.remove(); sharp.style.filter = 'none';   // at rest the card is just the card
+    pct.textContent = '100%';
+    card._hold = setTimeout(() => {               // 100 is held for a beat so it is seen
+      pill.dataset.state = 'added';
+      if (isAdd) {
+        pill.querySelector('.t').textContent = 'Added';
+        pill.setAttribute('aria-label', 'Saved to laconic’s examples');
+      } else {
+        pill.setAttribute('aria-label', word + ', in your deck');
+      }
+      pct.innerHTML = svgTick + (isAdd ? 'Added to laconic' : 'Added to your deck');
+      card._busy = false;
+      card._hide = setTimeout(() => card.classList.remove('show'), 1500 * speed());
+    }, 650 * speed());
+  };
+  card._raf = requestAnimationFrame(tick);
+}
+
+// States strip
+(function () {
+  const c = '#7a3cff';
+  const states = [
+    ['New', 'Raised coloured button with a + to add', pillHTML('pithy', c)],
+    ['Pressed', 'Sinks 1 pt and scales to 0.95', pillHTML('pithy', c, 'new', 'static-pressed')],
+    ['Making the card', 'Stays held down while the card generates; no animation of its own', pillHTML('pithy', c, 'generating')],
+    ['In your deck', 'Flat and grey with a coloured tick; tapping opens the card', pillHTML('pithy', c, 'added')],
+  ];
+  document.getElementById('states').innerHTML = states.map(([t, d, h]) => `<div class="state">${h}<small><b>${t}</b>${d}</small></div>`).join('');
+  document.getElementById('palette').innerHTML = ['terse', 'pithy', 'taciturn', 'reticent', 'loquacious', 'aphoristic']
+    .map((w, i) => pillHTML(w, PALETTE[i])).join('');
+  const s = 'Her laconic reply…';
+  document.getElementById('inkStates').innerHTML = [
+    ['Add', 'Raised neutral key at the end of each sentence', addHTML(s)],
+    ['Pressed', 'Same press as the word pills', addHTML(s, 'new', 'static-pressed')],
+    ['Adding', 'Held down while the card generates', addHTML(s, 'generating')],
+    ['Added', 'Flat; the sentence is on the detail page', addHTML(s, 'added')],
+  ].map(([t, d, h]) => `<div class="state">${h}<small><b>${t}</b>${d}</small></div>`).join('');
+})();
+
+// Theme
+document.getElementById('theme').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#theme button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  if (b.dataset.v === 'system') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.dataset.theme = b.dataset.v;
+});
+document.getElementById('replay').addEventListener('click', replay);
+document.getElementById('pace').addEventListener('input', e => { document.getElementById('paceV').textContent = (+e.target.value).toFixed(1) + 's'; });
+replay();
+</script>
+</body>
+</html>

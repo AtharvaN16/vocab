@@ -26,7 +26,7 @@ struct StudyView: View {
                 .accessibilityLabel("Close")
                 Spacer()
                 Text("\(collection.name) · \(queue.count) left")
-                    .font(.footnote.weight(.medium)).foregroundStyle(.secondary)
+                    .font(.footnote.weight(.medium)).foregroundStyle(.ink3)
                     .contentTransition(.numericText())
                 Spacer()
                 Color.clear.frame(width: 44, height: 44)
@@ -37,7 +37,7 @@ struct StudyView: View {
                     if let current = queue.first {
                         if queue.count > 1 {
                             let p = min(1, max(abs(offset.width) / geo.size.width, abs(offset.height) / geo.size.height))
-                            front(queue[1]).scaleEffect(0.92 + 0.08 * p).opacity(Double(p))
+                            front(queue[1]).underCard(p)
                         }
                         SwipeCard(offset: $offset, allowed: [.left, .right, .up, .down],
                                   flyOff: [.left, .right, .down], tilt: true) { dir in
@@ -60,28 +60,28 @@ struct StudyView: View {
             }
 
             Text("← didn't know   ↓ sort of   knew it →\n↑ ask AI")
-                .font(.footnote).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                .font(.footnote).foregroundStyle(.ink4).multilineTextAlignment(.center)
         }
         .padding(.horizontal, 24).padding(.vertical, 8)
         .background(Theme.page.ignoresSafeArea())
-        .sheet(item: $askWord) { AskView(word: $0) }
+        .sheet(item: $askWord) { AskView(word: $0).presentationDragIndicator(.visible) }
         .onAppear(perform: buildQueue)
     }
 
     private func front(_ word: Word) -> some View {
         let sense = word.senses.first
         return VStack(alignment: .leading, spacing: 14) {
-            Text("Which word means…").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+            Text("Which word means…").font(.subheadline.weight(.medium)).foregroundStyle(.ink3)
             if let sense {
                 Text(mask(sense.definition, word: word.text))
-                    .font(.system(.title2, design: .serif))
+                    .font(.title2)
                 if let ex = sense.examples.first {
                     Text("“\(mask(ex, word: word.text))”")
-                        .font(.system(.callout, design: .serif)).italic().foregroundStyle(.secondary)
+                        .font(.callout).italic().foregroundStyle(.ink3)
                 }
             }
             Spacer()
-            Text("Tap to reveal").font(.footnote).foregroundStyle(.tertiary)
+            Text("Tap to reveal").font(.footnote).foregroundStyle(.ink4)
                 .frame(maxWidth: .infinity)
         }
         .padding(32)
@@ -108,7 +108,7 @@ struct StudyView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Done for now").font(.system(size: 40, weight: .bold))
             Text("\(reviewed) reviews. Words come back when you're about to forget them.")
-                .font(.system(.title3, design: .serif)).foregroundStyle(.secondary)
+                .font(.title3).foregroundStyle(.ink3)
             Spacer()
             Button("Study everything anyway") { buildQueue(all: true) }
                 .font(.headline).frame(maxWidth: .infinity).frame(height: 56)

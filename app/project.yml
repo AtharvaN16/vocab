@@ -24,6 +24,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Vocab
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Vocab listens while you dictate a question about a word.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Vocab turns your dictated question into text, on your device when possible.
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"

@@ -7,7 +7,7 @@ struct CollectionsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @Query(sort: \WordCollection.createdAt) private var collections: [WordCollection]
+    @Query(sort: WordCollection.userOrder) private var collections: [WordCollection]
     @Query private var words: [Word]
 
     @State private var naming = false
@@ -51,7 +51,7 @@ struct CollectionsView: View {
                     }
                 }
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(.ink)
             .navigationTitle("Library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -65,7 +65,7 @@ struct CollectionsView: View {
                 TextField("Name", text: $newName)
                 Button("Create") {
                     let name = newName.trimmingCharacters(in: .whitespaces)
-                    if !name.isEmpty { context.insert(WordCollection(name: name)) }
+                    if !name.isEmpty { context.insert(WordCollection(name: name, order: WordCollection.nextOrder(in: context))) }
                     newName = ""
                 }
                 Button("Cancel", role: .cancel) { newName = "" }
@@ -82,8 +82,8 @@ struct CollectionsView: View {
         HStack {
             Text(title).fontWeight(isSelected ? .semibold : .regular)
             Spacer()
-            Text("\(count)").foregroundStyle(.secondary)
-            if isSelected { Image(systemName: "checkmark").foregroundStyle(.secondary) }
+            Text("\(count)").foregroundStyle(.ink3)
+            if isSelected { Image(systemName: "checkmark").foregroundStyle(.ink3) }
         }
         .contentShape(Rectangle())
     }
@@ -110,7 +110,7 @@ struct WordRow: View {
                 Text(word.text)
                 Spacer()
                 Text(word.reps == 0 ? "new" : "due \(word.due.formatted(.relative(presentation: .named)))")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.ink3)
             }
             .contentShape(Rectangle())
         }
