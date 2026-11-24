@@ -25,6 +25,12 @@ struct SwipeCard<Content: View>: View {
     var tilt = false
     /// Distance (points) the card travels and rests at for a committed swipe.
     var park: [SwipeDirection: CGFloat] = [:]
+    /// Swipes in these directions tap once, mid-drag, when the pull passes the commit
+    /// threshold: letting go now will go through. Release then stays silent.
+    var armHaptic: Set<SwipeDirection> = []
+    /// Told when the pull arms or disarms, and `false` once the touch has ended
+    /// (after `onSwipe`, so a committed swipe can still read the armed state).
+    var onArmChange: ((Bool) -> Void)? = nil
     /// While parked, a tap calls `onTap`; dragging back toward rest and
     /// releasing past the threshold springs the card home and calls `onUnpark`.
     var parked = false
@@ -49,6 +55,9 @@ struct SwipeCard<Content: View>: View {
     @State private var holds = 0
     /// A hold is under way: the press keeps deepening, slowly, until the hold fires.
     @State private var holding = false
+    /// This drag has passed the commit threshold in an `armHaptic` direction.
+    @State private var armed = false
+    @State private var arms = 0
     private let holdDuration = 0.45
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -66,6 +75,7 @@ struct SwipeCard<Content: View>: View {
                 .gesture(drag(in: geo.size))
                 .sensoryFeedback(.impact(weight: .light), trigger: commits)
                 .sensoryFeedback(.impact(weight: .medium), trigger: holds)
+                .sensoryFeedback(.impact(weight: .medium), trigger: arms)
                 .accessibilityAddTraits(onTap == nil ? [] : .isButton)
                 .accessibilityAction { onTap?() }
         }
@@ -130,6 +140,16 @@ struct SwipeCard<Content: View>: View {
                 } else {
                     tracked = rubberBand(raw, limit: limit * 0.6)
                 }
+                if armHaptic.contains(dir), allowed.contains(dir) {
+                    // The same distance and straightness rules the release uses.
+                    let threshold = axis == .horizontal ? size.width * 0.35 : 110
+                    let straight = axis == .horizontal || abs(t.height) > abs(t.width)
+                    // Hysteresis: arms past the threshold, disarms only 15 pt short of it,
+                    // so a shaking thumb on the line taps once, not repeatedly.
+                    setArmed(straight && abs(raw) > (armed ? threshold - 15 : threshold))
+                } else {
+                    setArmed(false)
+                }
                 var tx = Transaction()
                 tx.disablesAnimations = true
                 withTransaction(tx) {
@@ -139,6 +159,9 @@ struct SwipeCard<Content: View>: View {
             .onEnded { value in
                 pressed = false
                 cancelHold()
+                // The arming tap already said it: a committed release stays silent.
+                let wasArmed = armed
+                defer { setArmed(false) }
                 if held { held = false; axis = nil; return }
                 if parked {
                     guard let base = parkedBase else {
@@ -182,7 +205,11 @@ struct SwipeCard<Content: View>: View {
                 // flick that curved sideways doesn't open the up/down action.
                 let straight = axis == .horizontal
                     || abs(value.translation.height) > abs(value.translation.width)
-                let committed = allowed.contains(dir) && straight && (abs(raw) > threshold || flicked)
+                // Armed means ready: inside the hysteresis band it still commits, unless
+                // the finger flicks back the other way.
+                let flickedBack = abs(velocity) > 700 && velocity.sign != raw.sign
+                let committed = allowed.contains(dir) && straight
+                    && (abs(raw) > threshold || flicked || (wasArmed && !flickedBack))
 
                 if committed, handOff.contains(dir), let onHandOff {
                     commits += 1
@@ -210,16 +237,27 @@ struct SwipeCard<Content: View>: View {
                     }
                 } else {
                     if committed {
-                        commits += 1
+                        if !wasArmed { commits += 1 }
                         onSwipe(dir)
                     }
-                    // Release phase: fast snap-back seeded with the finger's velocity.
-                    withAnimation(.interpolatingSpring(duration: 0.4, bounce: reduceMotion ? 0 : 0.2,
+                    // Release phase, seeded with the finger's velocity. A cancel snaps back
+                    // with a little bounce: "not this time". A commit opens a sheet, and the
+                    // card settles home without bounce, on the sheet's unhurried family, so
+                    // it rises with the sheet as one move instead of wobbling under it.
+                    withAnimation(.interpolatingSpring(duration: committed ? 0.45 : 0.4,
+                                                       bounce: committed || reduceMotion ? 0 : 0.2,
                                                        initialVelocity: relative(cardVelocity, from: current, to: 0))) {
                         offset = .zero
                     }
                 }
             }
+    }
+
+    private func setArmed(_ on: Bool) {
+        guard on != armed else { return }
+        armed = on
+        if on { arms += 1 }
+        onArmChange?(on)
     }
 
     private func cancelHold() {

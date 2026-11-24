@@ -84,7 +84,7 @@ enum LayerCensus {
     @MainActor static func dump() {
         guard let window = UIApplication.shared.connectedScenes
             .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return }
-        var total = 0, filters: [String] = [], masks = 0, groupOpacity = 0
+        var total = 0, filters: [String] = [], masks = 0, groupOpacity = 0, clips = 0
         func walk(_ layer: CALayer) {
             total += 1
             if let f = layer.filters, !f.isEmpty {
@@ -92,11 +92,12 @@ enum LayerCensus {
                 filters.append("\(Int(layer.bounds.width))x\(Int(layer.bounds.height)) op=\(String(format: "%.2f", layer.opacity)) [\(names.joined(separator: ","))]")
             }
             if layer.mask != nil { masks += 1 }
+            if layer.masksToBounds { clips += 1 }
             if layer.opacity < 1, layer.opacity > 0, layer.allowsGroupOpacity, (layer.sublayers?.count ?? 0) > 0 { groupOpacity += 1 }
             layer.sublayers?.forEach(walk)
         }
         walk(window.layer)
-        print("LAYERS total=\(total) filters=\(filters.count) masks=\(masks) groupOpacity=\(groupOpacity) :: \(filters.joined(separator: " | "))")
+        print("LAYERS total=\(total) filters=\(filters.count) masks=\(masks) clips=\(clips) groupOpacity=\(groupOpacity) :: \(filters.joined(separator: " | "))")
         fflush(stdout)
     }
 }

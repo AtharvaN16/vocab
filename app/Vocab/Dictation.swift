@@ -47,7 +47,9 @@ final class Dictation {
             isRecording = true
             recognition = Self.recognize(recognizer, request) { [weak self] text, finished in
                 guard let self else { return }
-                if let text { self.transcript = text }
+                // Stopping ends the audio, and the recognizer often answers with a last
+                // result that is empty (or an error with none). Keep what was heard.
+                if let text, !text.isEmpty { self.transcript = text }
                 if finished { self.stop() }
             }
         } catch {

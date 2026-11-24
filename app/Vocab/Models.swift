@@ -69,21 +69,31 @@ final class WordCollection {
     var order: Int = 0
     /// The built-in Favorites collection: always present, can't be deleted.
     var isFavorites: Bool = false
+    /// A `CollectionColor` raw value; empty until one is assigned (see `ensureDefaults`).
+    var colorKey: String = ""
     @Relationship(inverse: \Word.collections) var words: [Word] = []
 
-    init(name: String, createdAt: Date = .now, order: Int = 0, isFavorites: Bool = false) {
+    init(name: String, createdAt: Date = .now, order: Int = 0, isFavorites: Bool = false,
+         color: CollectionColor? = nil) {
         self.name = name
         self.createdAt = createdAt
         self.order = order
         self.isFavorites = isFavorites
+        self.colorKey = color?.rawValue ?? ""
+    }
+
+    var color: CollectionColor {
+        get { CollectionColor(rawValue: colorKey) ?? .peach }
+        set { colorKey = newValue.rawValue }
     }
 
     /// User order first; creation date breaks ties for collections made before ordering existed.
     static let userOrder = [SortDescriptor(\WordCollection.order), SortDescriptor(\WordCollection.createdAt)]
 
-    /// Makes sure Favorites exists and is pinned at the top of the list.
-    static func ensureFavorites(in context: ModelContext) {
-        let all = (try? context.fetch(FetchDescriptor<WordCollection>())) ?? []
+    /// Makes sure Favorites exists and is pinned at the top of the list, and that
+    /// every other collection has a colour (older ones get one in list order).
+    static func ensureDefaults(in context: ModelContext) {
+        let all = (try? context.fetch(FetchDescriptor<WordCollection>(sortBy: userOrder))) ?? []
         let others = all.filter { !$0.isFavorites }
         let top = (others.map(\.order).min() ?? 0) - 1
         if let favorites = all.first(where: \.isFavorites) {
@@ -91,11 +101,47 @@ final class WordCollection {
         } else {
             context.insert(WordCollection(name: "Favorites", createdAt: .distantPast, order: top, isFavorites: true))
         }
+        for c in others where CollectionColor(rawValue: c.colorKey) == nil {
+            c.colorKey = nextColor(among: others).rawValue
+        }
+    }
+
+    /// The least-used colour among `collections`, earliest in the palette on a tie.
+    static func nextColor(among collections: [WordCollection]) -> CollectionColor {
+        let used = collections.compactMap { CollectionColor(rawValue: $0.colorKey) }
+        return CollectionColor.allCases.min { a, b in
+            used.count(where: { $0 == a }) < used.count(where: { $0 == b })
+        } ?? .peach
     }
 
     /// The next slot at the end of the user's order.
     static func nextOrder(in context: ModelContext) -> Int {
         let all = (try? context.fetch(FetchDescriptor<WordCollection>())) ?? []
         return (all.map(\.order).max() ?? 0) + 1
+    }
+}
+
+/// What the deck shows when it isn't home: every word, or one collection. Both
+/// get a title, a back chevron and Study.
+enum DeckScope: Hashable {
+    case all
+    case collection(WordCollection)
+
+    var title: String {
+        switch self {
+        case .all: return "All words"
+        case .collection(let c): return c.name
+        }
+    }
+
+    /// This scope's words, in the order of `allWords`.
+    func words(from allWords: [Word]) -> [Word] {
+        switch self {
+        case .all:
+            return allWords
+        case .collection(let c):
+            let id = c.persistentModelID
+            return allWords.filter { $0.collections.contains { $0.persistentModelID == id } }
+        }
     }
 }

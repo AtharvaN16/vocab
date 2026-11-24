@@ -2,7 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct AskView: View {
-    let word: Word
+    /// The word being asked about. Nil for Search's open questions, which use the
+    /// general and find-a-word prompts instead of the word's dictionary facts.
+    let word: Word?
     /// Pull-down to close: called with the finger's vertical travel while the
     /// panel owns the drag, then once on release with travel and velocity.
     var onPull: ((CGFloat) -> Void)? = nil
@@ -12,6 +14,11 @@ struct AskView: View {
     /// The panel has committed open. The opening questions wait for this, so a
     /// half-pulled card shows an empty panel and they arrive as it settles.
     var revealed = true
+    /// A question to ask as soon as the panel is open (Search's typed query).
+    /// Asked again only when it changes, so reopening keeps the conversation.
+    var opening: String? = nil
+    /// Opens a word the find-a-word answer suggested.
+    var onPick: ((SearchPick) -> Void)? = nil
 
     @AppStorage("engine") private var engineRaw = Engine.automatic.rawValue
     @AppStorage("groqKey") private var groqKey = ""
@@ -42,8 +49,6 @@ struct AskView: View {
     @State private var job: GenerateJob?
     /// Success tap when a card lands.
     @State private var landedCount = 0
-    /// The panel's top edge on screen; the forming card's stage reaches up by this much.
-    @State private var stageLift: CGFloat = 0
     /// Every saved word, so pills for words already in the deck show as added.
     @Query private var deck: [Word]
     /// Follow-up suggestions above the composer, shown once an answer has fully appeared.
@@ -66,12 +71,37 @@ struct AskView: View {
     /// Who owns the current drag: nil until decided, true = closing, false = scrolling.
     @State private var pulling: Bool?
 
-    private let presets = [
+    private static let wordPresets = [
         "How would I use it in conversation?",
         "How is it different from its closest synonyms?",
         "Give me three sentences that use it well.",
         "Quiz me on it.",
     ]
+    /// Search's opening questions: finding words, not studying one.
+    private static let openPresets = [
+        "A word for someone who never gives up",
+        "A more vivid way to say \u{201C}very tired\u{201D}",
+        "Words for the smell after rain",
+        "How do I sound confident without bragging?",
+    ]
+    private static let refinements = ["More literary", "One word only", "Less harsh", "More formal"]
+    private var presets: [String] { word == nil ? Self.openPresets : Self.wordPresets }
+
+    // Open questions (no word)
+    /// The opening question already asked, so the same one isn't asked twice.
+    @State private var askedOpening: String?
+    /// The last full answer, sent back with a follow-up.
+    @State private var answerText = ""
+    /// The current open question is a find-a-word one: candidates, not prose.
+    @State private var isFind = false
+    @State private var candidates: [FindWordPrompt.Candidate] = []
+    /// Candidates below this index were already on screen; newer ones arrive as a group.
+    @State private var arrivalBase = 0
+
+    private var followUps: [String] {
+        if word != nil { return presets.filter { $0 != asked } }
+        return isFind ? Self.refinements : []
+    }
 
     @State private var dictation = Dictation()
     /// What was typed before dictation started; the transcript is appended to it.
@@ -117,8 +147,10 @@ struct AskView: View {
                             ZStack(alignment: .topLeading) {
                                 if let error {
                                     Text(error).foregroundStyle(.red)
+                                } else if isFind, !candidates.isEmpty {
+                                    candidateList
                                 } else if !tokens.isEmpty {
-                                    StreamingAnswer(tokens: tokens, highlight: word.text, pills: pillContext)
+                                    StreamingAnswer(tokens: tokens, highlight: word?.text ?? "", pills: pillContext)
                                         // A fresh view per question: the words animate themselves,
                                         // so no outer animation may crossfade old text into new.
                                         .id(asked)
@@ -132,8 +164,8 @@ struct AskView: View {
                         .opacity(contentOut ? 0 : 1)
                         .blur(radius: contentOut && !reduceMotion ? 10 : 0)
 
-                            if showSuggestions {
-                                FollowUps(items: presets.filter { $0 != asked }, leaving: followUpsLeaving,
+                            if showSuggestions, !followUps.isEmpty {
+                                FollowUps(items: followUps, leaving: followUpsLeaving,
                                           tapped: tapped) { ask($0) }
                             }
                         }
@@ -173,21 +205,16 @@ struct AskView: View {
                 .padding(.horizontal, 16)
         }
         .background(Theme.page.ignoresSafeArea(edges: .bottom))
-        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { stageLift = $0 }
-        // A tapped pill's card forms over the whole screen. The panel sits below the parked
-        // deck card, so the stage reaches up past its own top edge to cover that card too.
+        // A tapped pill's card forms over the whole page, hoisted to the page's host so
+        // everything behind it (parked deck card, Search) fogs over, not just this panel.
         // It runs its own entrance and exit, so it is added and removed without animation.
-        .overlay {
-            if let job {
-                GenerateStage(job: job,
-                              onLanded: {
-                                  pillStates[job.tag.id] = .added
-                                  landedCount += 1
-                              },
-                              onDone: { self.job = nil })
-                    .id(job.id)
-                    .padding(.top, -stageLift)
-            }
+        .pageOverlay(item: job) { job in
+            GenerateStage(job: job,
+                          onLanded: {
+                              pillStates[job.tag.id] = .added
+                              landedCount += 1
+                          },
+                          onDone: { self.job = nil })
         }
         // While a card forms, a drag on the scrim must not pull the panel closed.
         .simultaneousGesture(pullGesture, including: onPull == nil ? .none : job == nil ? .all : .subviews)
@@ -199,12 +226,23 @@ struct AskView: View {
         .sensoryFeedback(.success, trigger: landedCount)
         .onDisappear { task?.cancel(); choreo?.cancel(); arrival?.cancel(); dictation.stop() }
         .onChange(of: revealed, initial: true) { _, open in
+            // An opening question skips the presets and goes straight to its answer.
+            if open, let opening, opening != askedOpening {
+                askedOpening = opening
+                ask(opening, fresh: true)
+                return
+            }
             stagePresets(open)
             // Closing Ask drops a card still forming; its pill can be tapped again.
             if !open, let job {
                 if pillStates[job.tag.id] == .generating { pillStates[job.tag.id] = nil }
                 self.job = nil
             }
+        }
+        .onChange(of: opening) { _, new in
+            guard revealed, let new, new != askedOpening else { return }
+            askedOpening = new
+            ask(new, fresh: true)
         }
         // Builds the forming card's GPU pipelines before the first pill can be tapped.
         .overlay(alignment: .topLeading) { if revealed { FormingWarmup() } }
@@ -328,6 +366,54 @@ struct AskView: View {
             .firstIndex(of: i) ?? 0
         return ExitMotion(delay: Self.waveDelays[min(rank, 3)], duration: 0.4,
                           drift: i < t ? -14 : 14, blur: 5, scale: 1)
+    }
+
+    // MARK: Find a word (open questions)
+
+    /// Suggested words, big, each with the AI's reason. Tapping one opens it in the word sheet.
+    private var candidateList: some View {
+        let saved = Set(deck.map { $0.text.lowercased() })
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(candidates.enumerated()), id: \.element) { i, c in
+                Button { onPick?(SearchPick(text: c.word, note: c.gloss)) } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(c.word)
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundStyle(.ink)
+                            Text(c.gloss)
+                                .font(.subheadline)
+                                .foregroundStyle(.ink3)
+                                .multilineTextAlignment(.leading)
+                        }
+                        Spacer(minLength: 0)
+                        if saved.contains(c.word.lowercased()) {
+                            Label("Saved", systemImage: "checkmark")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.ink3)
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .modifier(ArriveOnce(delay: Self.stagger(i - arrivalBase), reduceMotion: reduceMotion))
+            }
+        }
+        // The rows carry the entrance; the list itself must not fade over them.
+        .transition(.identity)
+    }
+
+    /// Tightening gaps, so the list arrives as one wave rather than a queue.
+    private static func stagger(_ i: Int) -> Double {
+        [0, 0.05, 0.09, 0.12, 0.14, 0.15][max(0, min(i, 5))]
+    }
+
+    private func update(candidates new: [FindWordPrompt.Candidate]) {
+        guard new.count > candidates.count else { return }
+        arrivalBase = candidates.count
+        if waiting { withAnimation(.strongEaseOut(0.25)) { waiting = false } }
+        candidates = new
     }
 
     /// A floating box: the question on top, the model pill and buttons along its bottom edge.
@@ -472,7 +558,7 @@ struct AskView: View {
     private func tapPill(_ tag: PillTag) {
         guard job == nil, (pillStates[tag.id] ?? .new) == .new else { return }
         pillStates[tag.id] = .generating
-        let new = GenerateJob(tag: tag, hostWord: word.text)
+        let new = GenerateJob(tag: tag, hostWord: word?.text ?? "")
         job = new
         guard tag.kind == .word else { return }
         // The definition arrives while the card is still a blur.
@@ -483,7 +569,8 @@ struct AskView: View {
         }
     }
 
-    private func ask(_ q: String) {
+    /// `fresh` starts a new conversation: an open follow-up otherwise carries the last exchange.
+    private func ask(_ q: String, fresh: Bool = false) {
         let q = q.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return }
         askCount += 1
@@ -497,15 +584,21 @@ struct AskView: View {
         question = ""
         dictationBase = ""
         focused = false
+        // The earlier exchange, for an open follow-up.
+        let previous: (question: String, answer: String)? =
+            word == nil && !fresh && asked != nil && !answerText.isEmpty ? (asked!, answerText) : nil
+        let find = word == nil && (FindWordPrompt.matches(q) || (previous != nil && isFind))
 
         // Start the model now; the choreography only decides when its words may show.
         let fromPresets = asked == nil
         // Either wave is visibly gone by ~0.75s (strong ease-out); the question starts as
         // the tapped row's tail fades, leaving only a short beat of empty space.
-        let exitTime = reduceMotion ? 0.25 : 0.85
+        // Nothing on screen yet (an opening question): just a beat while the panel settles.
+        let exitTime = fromPresets && presetsIn == 0 ? 0.2 : reduceMotion ? 0.25 : 0.85
         // The answer waits until the question has settled (0.65s), so the two never arrive together.
         let floor = Date.now.addingTimeInterval(exitTime + (reduceMotion ? 0 : 0.65))
         var pending: [RevealToken] = []
+        var pendingFound: [FindWordPrompt.Candidate] = []
         var entered = false
 
         choreo = Task {
@@ -528,6 +621,9 @@ struct AskView: View {
             plain.disablesAnimations = true
             withTransaction(plain) {
                 tokens = []
+                candidates = []
+                arrivalBase = 0
+                isFind = find
                 error = nil
                 showSuggestions = false
                 followUpsLeaving = false
@@ -543,18 +639,20 @@ struct AskView: View {
                 contentOut = false
                 tokens = pending
             }
+            update(candidates: pendingFound)
             entered = true
 
             // 3. If the model is still working once the question settles, say so quietly.
             try? await Task.sleep(for: .seconds(reduceMotion ? 0 : 0.65))
-            guard !Task.isCancelled, tokens.isEmpty, error == nil else { return }
+            guard !Task.isCancelled, tokens.isEmpty, candidates.isEmpty, error == nil else { return }
             withAnimation(.strongEaseOut(0.5)) { waiting = true }
         }
 
         // 3. Words queue up behind the question's entrance, then stream in.
         let explainer = self.explainer
-        let word = word.text, facts = self.word.facts
-        let senses = self.word.senses, details = self.word.details
+        let host = self.word
+        let word = host?.text ?? "", facts = host?.facts ?? ""
+        let senses = host?.senses ?? [], details = host?.details
         task = Task {
             do {
                 #if DEBUG
@@ -563,9 +661,20 @@ struct AskView: View {
                 #endif
                 var shown = ""
                 // Templates answer the default questions from the dictionary, with pills.
-                let source = await TemplateAnswers.stream(explainer, word: word, facts: facts, senses: senses,
-                                                          details: details, question: q)
+                // Open questions (Search) use the general or find-a-word prompt instead.
+                let source = host == nil
+                    ? explainer.respond(instructions: find ? FindWordPrompt.instructions : GeneralPrompt.instructions,
+                                        prompt: GeneralPrompt.user(question: q, previous: previous))
+                    : await TemplateAnswers.stream(explainer, word: word, facts: facts, senses: senses,
+                                                   details: details, question: q)
                 for try await partial in source {
+                    answerText = partial
+                    // Find-a-word answers arrive as candidate rows, one complete line at a time.
+                    if find {
+                        let found = FindWordPrompt.parse(partial, complete: false)
+                        if entered { update(candidates: found) } else { pendingFound = found }
+                        continue
+                    }
                     var list = entered ? tokens : pending
                     if partial.hasPrefix(shown) {
                         list += RevealToken.schedule(String(partial.dropFirst(shown.count)),
@@ -582,6 +691,20 @@ struct AskView: View {
                         tokens = list
                     } else { pending = list }
                     revealEnd = (list.last?.born ?? .now).addingTimeInterval(StreamingAnswer.duration)
+                }
+                if find {
+                    let all = FindWordPrompt.parse(answerText, complete: true)
+                    await choreo?.value
+                    if all.isEmpty {
+                        // The model ignored the format; show what it said.
+                        isFind = false
+                        tokens = RevealToken.schedule(answerText, after: .now, instant: reduceMotion)
+                        revealEnd = (tokens.last?.born ?? .now).addingTimeInterval(StreamingAnswer.duration)
+                    } else {
+                        update(candidates: all)
+                        revealEnd = .now.addingTimeInterval(0.3)
+                    }
+                    if waiting { withAnimation(.strongEaseOut(0.3)) { waiting = false } }
                 }
                 // 4. Once the last word lands, follow-ups rise in under the answer.
                 try await Task.sleep(for: .seconds(max(0, revealEnd.timeIntervalSinceNow) + 0.15))
@@ -1060,5 +1183,48 @@ private struct RevealRenderer: TextRenderer {
                 c.draw(run)
             }
         }
+    }
+}
+
+
+/// Fades and rises in the first time the view appears, after `delay`.
+struct ArriveOnce: ViewModifier {
+    let delay: Double
+    let reduceMotion: Bool
+    @State private var shown = false
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .blur(radius: shown || reduceMotion ? 0 : 6)
+            .offset(y: shown || reduceMotion ? 0 : 8)
+            // A timer, not an animation delay: a delayed animation started inside
+            // another transaction runs with it, and the wave collapses into one fade.
+            .task {
+                if !reduceMotion, delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+                withAnimation(.strongEaseOut(reduceMotion ? 0.2 : 0.4)) { shown = true }
+            }
+    }
+}
+
+/// Hosts AskView so it re-renders only when its inputs change. Its callbacks are
+/// fresh closures on every parent render, which SwiftUI cannot compare, so without
+/// this every frame of a card or sheet drag rebuilt the whole Ask panel.
+struct AskPanel: View, Equatable {
+    let word: Word?
+    var opening: String? = nil
+    let revealed: Bool
+    let onPull: (CGFloat) -> Void
+    let onPullEnd: (CGFloat, CGFloat) -> Void
+    let onClose: () -> Void
+    var onPick: ((SearchPick) -> Void)? = nil
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.word == b.word && a.opening == b.opening && a.revealed == b.revealed
+    }
+
+    var body: some View {
+        AskView(word: word, onPull: onPull, onPullEnd: onPullEnd, onClose: onClose,
+                revealed: revealed, opening: opening, onPick: onPick)
+            .id(word?.text ?? "")
     }
 }

@@ -22,7 +22,29 @@ enum SenseRanker {
     /// Share of content words two definitions must have in common to count as one sense.
     static let duplicateOverlap = 0.6
 
+    private struct Key: Hashable {
+        var senses: [Sense]
+        var tags: [SenseTag]?
+        var limit: Int
+    }
+
+    /// Ranking runs the sentence-embedding model, which takes hundreds of
+    /// milliseconds; views call this from `body` (every deck card), so a
+    /// re-render must never pay for it twice. Measured on an iPhone 11 Pro:
+    /// each collection toggle re-ran it for the card under the sheet, at
+    /// 0.8–1.5 s of main-thread time per tap.
+    private static var cache: [Key: Result] = [:]
+
     static func rank(_ senses: [Sense], tags: [SenseTag]?, limit: Int = 3) -> Result {
+        let key = Key(senses: senses, tags: tags, limit: limit)
+        if let hit = cache[key] { return hit }
+        let result = computeRank(senses, tags: tags, limit: limit)
+        if cache.count > 500 { cache.removeAll() }
+        cache[key] = result
+        return result
+    }
+
+    private static func computeRank(_ senses: [Sense], tags: [SenseTag]?, limit: Int) -> Result {
         guard !senses.isEmpty else { return Result(shown: [], hidden: []) }
         let current = senses.filter { !isOutOfUse($0, tags: tags) && !isNoise($0) }
         let pool = current.isEmpty ? senses : current

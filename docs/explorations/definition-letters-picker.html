@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Definition Letters</title>
+<style>
+.app {
+  --card: #eaeaea; --control: #e6e6e6;
+  --ink: #121212; --ink2: #424242; --ink3: #808080; --ink4: #a3a3a3; --grain-op: .09;
+}
+.app[data-theme="dark"] {
+  --card: #1c1c1c; --control: #292929;
+  --ink: #f5f5f5; --ink2: #cccccc; --ink3: #999999; --ink4: #6b6b6b; --grain-op: .06;
+}
+:root {
+  --fg: var(--foreground, #161616);
+  --muted-fg: var(--muted-foreground, #6b6b6b);
+  --line: var(--border, rgba(127,127,127,.28));
+  --sf: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --rounded: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+  --serif: ui-serif, "New York", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, system-ui, sans-serif); color: var(--fg); }
+
+.wrap { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: start; max-width: 1000px; margin: 0 auto; }
+@media (max-width: 680px) { .wrap { grid-template-columns: 1fr; justify-items: center; } .panel { justify-self: stretch; } }
+
+.round { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted-fg); font-weight: 600; margin: 4px 0 6px; }
+.name { font-size: 22px; margin: 0 0 6px; letter-spacing: -.01em; }
+.desc { font-size: 14px; line-height: 1.5; color: var(--muted-fg); margin: 0 0 18px; min-height: 42px; max-width: 360px; }
+.arrows { display: flex; align-items: center; gap: 14px; }
+.arrows button { width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--fg); font-size: 20px; cursor: pointer; }
+.arrows button:hover { border-color: var(--fg); }
+.count { font-size: 14px; font-weight: 600; color: var(--muted-fg); font-variant-numeric: tabular-nums; min-width: 52px; text-align: center; }
+.verdict { display: flex; flex-wrap: nowrap; gap: 8px; margin-top: 22px; }
+.verdict button { font-size: 24px; line-height: 1; width: 52px; height: 52px; flex: none; color: var(--fg); background: none; border: 1px solid var(--line);
+  border-radius: 50%; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.verdict button[aria-pressed="true"] { border-color: var(--fg); background: var(--line); }
+.tally { font-size: 13px; color: var(--muted-fg); margin: 12px 0 0; min-height: 18px; }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 22px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--muted-fg); background: none; border: 0; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { color: var(--fg); background: var(--line); }
+.copy { font: inherit; font-size: 13px; font-weight: 600; color: var(--fg); background: none; border: 1px solid var(--fg); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.count .mark { margin-left: 4px; }
+.panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted-fg); font-weight: 600; margin: 0 0 8px; }
+.panel section { margin-bottom: 18px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { font: inherit; font-size: 13px; font-weight: 500; color: var(--muted-fg); background: none; border: 1px solid var(--line);
+  padding: 7px 11px; border-radius: 999px; cursor: pointer; }
+.chips button[aria-pressed="true"] { color: var(--fg); border-color: var(--fg); }
+.picks { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.picks button { width: 100%; text-align: left; font: inherit; color: var(--fg); background: none; border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 12px; cursor: pointer; display: grid; grid-template-columns: 22px 1fr; gap: 2px 8px; }
+.picks button .k { font-weight: 700; color: var(--muted-fg); grid-row: span 2; font-variant-numeric: tabular-nums; }
+.picks button .t { font-size: 14px; font-weight: 600; }
+.picks button .why { font-size: 12.5px; line-height: 1.4; color: var(--muted-fg); }
+.picks button[aria-pressed="true"] { border-color: var(--fg); }
+.picks button[aria-pressed="true"] .k { color: var(--fg); }
+.stepper { display: flex; gap: 8px; }
+.stepper button { font: inherit; font-size: 13px; font-weight: 500; color: var(--muted-fg); background: none; border: 1px solid var(--line); padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+.swift { font-family: var(--font-mono, ui-monospace, Menlo, monospace); font-size: 12px; line-height: 1.6; white-space: pre-wrap;
+  padding: 12px 14px; border-radius: var(--radius, 10px); background: var(--code-background, rgba(127,127,127,.1)); }
+
+/* ---- Phone ---- */
+.stage { position: relative; width: calc(390px * var(--s)); height: calc(844px * var(--s)); border-radius: calc(54px * var(--s)); overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line), 0 18px 40px -20px rgba(0,0,0,.35); --s: .78; }
+.screen { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform: scale(var(--s)); transform-origin: 0 0; overflow: hidden;
+  background: var(--card); color: var(--ink); font-family: var(--sf); }
+.screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: var(--grain-op);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; background: #000; border-radius: 20px; }
+.clock { position: absolute; top: 20px; left: 48px; font-size: 17px; font-weight: 600; }
+.dx { position: absolute; top: 67px; left: 32px; width: 36px; height: 36px; border-radius: 50%; background: var(--control); display: grid; place-items: center; }
+.body { position: absolute; left: 32px; right: 32px; top: 131px; }
+.head { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.word { font-size: 44px; font-weight: 700; line-height: 52px; letter-spacing: -.01em; margin: 0; }
+.speak { width: 44px; height: 44px; display: grid; place-items: center; color: var(--ink3); }
+.bar { position: absolute; left: 24px; right: 24px; bottom: 42px; }
+.segs { display: flex; gap: 5px; margin-bottom: 22px; }
+.segs i { flex: 1; height: 4px; border-radius: 2px; background: var(--ink4); opacity: .35; }
+.segs i.on { background: var(--ink); opacity: 1; }
+.next { height: 56px; border-radius: 28px; background: var(--control); display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 18px; font-weight: 600; }
+
+/* ---- Definitions: one grid for all of them, so every number column lines up ---- */
+.defs { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; }
+.def { margin: 0 0 22px; font-family: var(--d-family); font-weight: var(--d-weight); color: var(--d-color); font-size: 28px; line-height: var(--d-lh, 33px); }
+.def:last-child { margin-bottom: 0; }
+.defs.solo { grid-template-columns: 1fr; }
+.n { font-family: var(--n-family); font-weight: var(--n-weight); font-style: var(--n-style); color: var(--n-color, var(--ink4));
+  font-size: 28px; line-height: 33px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Margin: the number sits outside the text column, in the page margin. */
+.l-margin .defs { grid-template-columns: 0 1fr; column-gap: 0; }
+.l-margin .n { justify-self: end; padding-right: 9px; font-size: 15px; line-height: 1; }
+
+/* Above: a small number on its own line over each definition. */
+.l-above .defs { grid-template-columns: 1fr; }
+.l-above .n { font-size: 17px; line-height: 22px; margin-bottom: 4px; }
+
+/* Inline: the number runs into the text in the word's ink. */
+.l-inline .defs { grid-template-columns: 1fr; }
+.l-inline .n { color: var(--ink); margin-right: 10px; }
+
+/* Ruled: hairlines between definitions, small numbers. */
+.l-rule .n { font-size: 15px; line-height: 1; align-self: start; padding-top: 26px; }
+.l-rule .def { margin: 0; padding: 18px 0; border-top: 1.5px solid color-mix(in srgb, var(--ink4) 35%, transparent); }
+.l-rule .n.first { padding-top: 8px; }
+.l-rule .def.first { border-top: 0; padding-top: 0; }
+
+/* First leads: the main definition stays big, the rest step down. */
+.l-lead .rest { font-size: 22px; line-height: 27px; }
+
+/* Ghost: a big faint numeral. */
+.l-ghost .n { font-size: 44px; line-height: 38px; font-weight: 700; color: var(--ink); opacity: .12; align-self: start; letter-spacing: -.03em; }
+
+/* Small, raised: a small number at the top of the first line, like a footnote. */
+/* Mid: a 22 pt letter on the first line's baseline. */
+.l-mid .n { font-size: 22px; }
+/* Small caps: a 17 pt capital on the baseline. */
+.l-cap .n { font-size: 17px; letter-spacing: .04em; }
+.l-raised .n { font-size: 15px; line-height: 1; align-self: start; padding-top: 7px; }
+.l-raised .defs { column-gap: 8px; }
+
+/* Badge / ring / filled: the number in a small circle beside the first line. */
+.l-filled .n { background: var(--ink4); color: var(--card); }
+.l-filled .n, .l-badge .n, .l-ring .n { width: 28px; height: 28px; margin-top: 3px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 14px; line-height: 1; align-self: start; font-weight: 700; }
+.l-badge .n { background: var(--control); color: var(--ink2); }
+.l-ring .n { box-shadow: inset 0 0 0 2px var(--ink4); }
+.l-badge .defs, .l-ring .defs, .l-filled .defs { column-gap: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage app" data-theme="light">
+    <div class="screen" id="screen">
+      <div class="island"></div><div class="clock">9:41</div>
+      <div class="dx"><svg width="15" height="15" viewBox="0 0 15 15"><path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+      <div class="body">
+        <div class="head"><p class="word" id="word"></p>
+          <div class="speak"><svg width="22" height="18" viewBox="0 0 22 18"><path d="M1 6h4l5-5v16l-5-5H1z" fill="currentColor"/><path d="M13.5 5.5a4.6 4.6 0 0 1 0 7M16.5 2.5a8.8 8.8 0 0 1 0 13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></div>
+        </div>
+        <div class="defs" id="defs"></div>
+      </div>
+      <div class="bar">
+        <div class="segs"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="next"><span>In a sentence</span><svg width="10" height="16" viewBox="0 0 10 16"><path d="M2 2l6 6-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="round" id="round"></p>
+    <h2 class="name" id="name"></h2>
+    <p class="desc" id="desc"></p>
+    <div class="arrows">
+      <button id="prev" aria-label="Previous option">←</button>
+      <span class="count" id="count"></span>
+      <button id="nextpick" aria-label="Next option">→</button>
+    </div>
+    <div class="verdict">
+      <button data-mark="hate" title="I hate it very much" aria-label="I hate it very much">😡</button>
+      <button data-mark="no" title="I don't like it" aria-label="I don't like it">👎</button>
+      <button data-mark="meh" title="Neutral" aria-label="Neutral">😐</button>
+      <button data-mark="yes" title="I like it" aria-label="I like it">👍</button>
+      <button data-mark="love" title="I like it very much" aria-label="I like it very much">😍</button>
+    </div>
+    <div class="tally" id="tally"></div>
+    <div class="tools">
+      <div class="seg" role="group" aria-label="Appearance">
+        <button data-theme-btn="light" aria-pressed="true">Light</button>
+        <button data-theme-btn="dark" aria-pressed="false">Dark</button>
+      </div>
+      <button class="copy" id="copy">Copy my response</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Everything from the two earlier rounds, in their order. */
+const ALL = [
+  ['Round 3 · letters', 'Letters', 'Your pick from last round: "a." in the definitions\' own type and the faintest ink, hanging.', { layout: 'hang', format: 'letter', nfont: 'sf', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters, no dot', '"a" alone: one less mark on the page.', { layout: 'hang', format: 'lplain', nfont: 'sf', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters with a bracket', '"a)", the way a list in a note or an exam paper reads.', { layout: 'hang', format: 'lparen', nfont: 'sf', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters, a step darker', '"a." in the definitions\' own grey, so the letter is as easy to read as the text.', { layout: 'hang', format: 'letter', nfont: 'sf', ncolor: 'ink3' }],
+  ['Round 3 · letters', 'Letters, Light', '"a." in SF Pro Light: present but very quiet.', { layout: 'hang', format: 'letter', nfont: 'light', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters, Rounded', '"a" in SF Pro Rounded: a softer letter.', { layout: 'hang', format: 'lplain', nfont: 'rounded', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters, smaller', '"a." at 22 pt on the first line\'s baseline: between full size and a footnote.', { layout: 'mid', format: 'letter', nfont: 'sf', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters, small and raised', '"a" at 15 pt at the top of the first line, like a footnote.', { layout: 'raised', format: 'lplain', nfont: 'sf', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Small capitals', '"A" at 17 pt on the baseline, slightly spaced.', { layout: 'cap', format: 'upper', nfont: 'sf', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters, Mono', '"a" in SF Mono: neat and even.', { layout: 'hang', format: 'lplain', nfont: 'mono', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Letters in a badge', '"a" in a small grey circle, the app\'s control fill.', { layout: 'badge', format: 'lplain', nfont: 'rounded', ncolor: 'ink4' }],
+  ['Round 3 · letters', 'Big ghost letters', 'A 44 pt "a" at 12% ink behind the start of each definition.', { layout: 'ghost', format: 'lplain', nfont: 'sf', ncolor: 'ink4' }],
+];
+const state = { layout: 'hang', format: 'letter', nfont: 'sf', dfont: 'sf', ncolor: 'ink4', word: '0', theme: 'light' };
+
+const WORDS = [
+  { w: 'lambent', d: ['Of light or fire: glowing or flickering softly.', 'Of wit: lightly brilliant.', 'Of eyes or the sky: softly bright.'] },
+  { w: 'perspicacious', d: ['Having a ready insight into and understanding of things; shrewd and discerning.', 'Clear-sighted; able to see clearly or far.'] },
+  { w: 'aplomb', d: ['Self-confidence or assurance, especially when in a demanding situation.'] },
+];
+const NFONT = {
+  sf:      { family: 'var(--sf)', weight: 600, style: 'normal', swift: 'weight: .semibold' },
+  heavy:   { family: 'var(--sf)', weight: 800, style: 'normal', swift: 'weight: .heavy' },
+  light:   { family: 'var(--sf)', weight: 300, style: 'normal', swift: 'weight: .light' },
+  rounded: { family: 'var(--rounded)', weight: 700, style: 'normal', swift: 'weight: .bold, design: .rounded' },
+  serif:   { family: 'var(--serif)', weight: 600, style: 'normal', swift: 'weight: .semibold, design: .serif' },
+  serifit: { family: 'var(--serif)', weight: 500, style: 'italic', swift: 'weight: .medium, design: .serif).italic(' },
+  mono:    { family: 'var(--mono)', weight: 600, style: 'normal', swift: 'weight: .semibold, design: .monospaced' },
+};
+const DFONT = {
+  sf:      { family: 'var(--sf)', weight: 600, color: 'var(--ink3)', lh: '33px', swift: '.system(size: 28, weight: .semibold) · .secondary' },
+  serif:   { family: 'var(--serif)', weight: 500, color: 'var(--ink3)', lh: '34px', swift: '.system(size: 28, weight: .medium, design: .serif) · .secondary' },
+  rounded: { family: 'var(--rounded)', weight: 600, color: 'var(--ink3)', lh: '33px', swift: '.system(size: 28, weight: .semibold, design: .rounded) · .secondary' },
+  book:    { family: 'var(--serif)', weight: 400, color: 'var(--ink2)', lh: '35px', swift: '.system(size: 28, design: .serif) · .ink2' },
+};
+const ROMAN = ['i', 'ii', 'iii', 'iv'];
+const fmt = i => ({ dot: `${i + 1}.`, plain: `${i + 1}`, roman: `${ROMAN[i]}.`, letter: `${'abcd'[i]}.`, zero: `0${i + 1}`,
+  lplain: 'abcd'[i], lparen: `${'abcd'[i]})`, upper: 'ABCD'[i], upperdot: `${'ABCD'[i]}.` })[state.format];
+const NUMBER_SIZE = { mid: 22, cap: 17, hang: 28, margin: 15, above: 17, inline: 28, rule: 15, lead: 28, ghost: 44, badge: 14, ring: 14, filled: 14, raised: 15 };
+
+function render() {
+  const screen = document.getElementById('screen');
+  screen.className = `screen l-${state.layout}`;
+  document.querySelector('.stage').setAttribute('data-theme', state.theme);
+  const nf = NFONT[state.nfont], df = DFONT[state.dfont];
+  screen.style.setProperty('--n-color', `var(--${state.ncolor})`);
+  screen.style.setProperty('--n-family', nf.family); screen.style.setProperty('--n-weight', nf.weight); screen.style.setProperty('--n-style', nf.style);
+  screen.style.setProperty('--d-family', df.family); screen.style.setProperty('--d-weight', df.weight);
+  screen.style.setProperty('--d-color', df.color); screen.style.setProperty('--d-lh', df.lh);
+
+  const e = WORDS[+state.word];
+  document.getElementById('word').textContent = e.w;
+  const defs = document.getElementById('defs');
+  const many = e.d.length > 1;
+  defs.classList.toggle('solo', !many);
+  defs.innerHTML = e.d.map((d, i) => {
+    const cls = `${i === 0 ? 'first' : 'rest'}`;
+    if (!many) return `<p class="def ${cls}">${d}</p>`;
+    const n = `<span class="n ${cls}">${fmt(i)}</span>`;
+    if (state.layout === 'inline') return `<p class="def ${cls}">${n}${d}</p>`;
+    return `${n}<p class="def ${cls}">${d}</p>`;
+  }).join('');
+  // First leads: the smaller definitions' numbers shrink with them.
+  if (state.layout === 'lead') defs.querySelectorAll('.n.rest').forEach(n => { n.style.fontSize = '22px'; n.style.lineHeight = '27px'; });
+
+  const sample = [0, 1].map(fmt).join(', ');
+  if (document.getElementById('swift')) document.getElementById('swift').textContent =
+`// Numbers (${sample}…), shown only with 2+ definitions
+.font(.system(size: ${NUMBER_SIZE[state.layout]}, ${nf.swift}))
+// Definitions
+.font(${df.swift.split(' · ')[0]})
+.foregroundStyle(${df.swift.split(' · ')[1]})`;
+
+}
+let pick = 0;
+/* Your marks, kept in this browser so a reload doesn't lose them. */
+const KEY = 'vocab-definition-letter-marks';
+let marks = {};
+try { marks = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { marks = {}; }
+const GLYPH = { love: '😍', yes: '👍', meh: '😐', no: '👎', hate: '😡' };
+const saveMarks = () => { try { localStorage.setItem(KEY, JSON.stringify(marks)); } catch (e) {} };
+function showMarks() {
+  const name = ALL[pick][1], m = marks[name];
+  document.querySelectorAll('[data-mark]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mark === m));
+  const n = v => ALL.filter(o => marks[o[1]] === v).length;
+  const marked = n('love') + n('yes') + n('meh') + n('no') + n('hate');
+  document.getElementById('tally').textContent =
+    `${n('love')} love · ${n('yes')} like · ${n('meh')} neutral · ${n('no')} don't like · ${n('hate')} hate · ${ALL.length - marked} unmarked`;
+  document.getElementById('count').innerHTML = `${pick + 1} / ${ALL.length}${m ? `<span class="mark">${GLYPH[m]}</span>` : ''}`;
+}
+document.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', () => {
+  const name = ALL[pick][1];
+  marks[name] = marks[name] === b.dataset.mark ? undefined : b.dataset.mark;   // tap again to clear
+  if (!marks[name]) delete marks[name];
+  saveMarks(); showMarks();
+}));
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.addEventListener('click', () => {
+  state.theme = b.dataset.themeBtn;
+  document.querySelectorAll('[data-theme-btn]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  render();
+}));
+document.getElementById('copy').addEventListener('click', async () => {
+  const list = v => ALL.filter(o => marks[o[1]] === v).map(o => `- ${o[1]}`).join('\n') || '- (none)';
+  const text = `Definition letters feedback (round 3)\n\nI like it very much:\n${list('love')}\n\nI like it:\n${list('yes')}\n\nNeutral:\n${list('meh')}\n\nI don't like it:\n${list('no')}\n\nI hate it very much:\n${list('hate')}`;
+  const btn = document.getElementById('copy');
+  try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); btn.textContent = 'Copied'; } catch (e2) { btn.textContent = 'Copy failed'; }
+    ta.remove();
+  }
+  setTimeout(() => { btn.textContent = 'Copy my response'; }, 1600);
+});
+function choose(i) {
+  pick = (i + ALL.length) % ALL.length;
+  const [round, name, desc, combo] = ALL[pick];
+  Object.assign(state, combo);
+  document.getElementById('round').textContent = round;
+  document.getElementById('name').textContent = name;
+  document.getElementById('desc').textContent = desc;
+  render();
+  showMarks();
+}
+document.getElementById('prev').addEventListener('click', () => choose(pick - 1));
+document.getElementById('nextpick').addEventListener('click', () => choose(pick + 1));
+addEventListener('keydown', ev => { if (ev.key === 'ArrowRight') choose(pick + 1); if (ev.key === 'ArrowLeft') choose(pick - 1); });
+function fit() {
+  const s = innerWidth > 680 ? 0.78 : Math.min(0.78, (innerWidth - 24) / 390);
+  document.querySelector('.stage').style.setProperty('--s', Math.max(0.5, s).toFixed(3));
+}
+addEventListener('resize', fit);
+fit(); choose(0);
+</script>
+</body>
+</html>

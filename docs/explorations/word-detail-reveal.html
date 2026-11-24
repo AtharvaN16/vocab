@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word Detail Layouts</title>
+<style>
+/* ---------- App tokens (Theme.swift), scoped to the phones ---------- */
+.app {
+  --card: #eaeaea; --control: #e6e6e6; --behind: #f4f4f4;
+  --ink: #121212; --ink2: #424242; --ink3: #808080; --ink4: #a3a3a3;
+  --grain-op: .09; --lift: rgba(0,0,0,.16);
+}
+@media (prefers-color-scheme: dark) {
+  .app:not([data-theme="light"]) {
+    --card: #1c1c1c; --control: #292929; --behind: #000;
+    --ink: #f5f5f5; --ink2: #cccccc; --ink3: #999999; --ink4: #6b6b6b;
+    --grain-op: .06; --lift: rgba(0,0,0,.6);
+  }
+}
+.app[data-theme="dark"] {
+  --card: #1c1c1c; --control: #292929; --behind: #000;
+  --ink: #f5f5f5; --ink2: #cccccc; --ink3: #999999; --ink4: #6b6b6b;
+  --grain-op: .06; --lift: rgba(0,0,0,.6);
+}
+
+/* ---------- Page chrome ---------- */
+:root {
+  --fg: var(--foreground, #161616);
+  --muted-fg: var(--muted-foreground, #6b6b6b);
+  --line: var(--border, rgba(127,127,127,.25));
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif); color: var(--fg); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 4px 0 24px; }
+h1 { font-size: 20px; font-weight: 650; margin: 0 0 6px; letter-spacing: -.01em; }
+.lede { color: var(--muted-fg); font-size: 14px; line-height: 1.5; margin: 0 0 10px; max-width: 780px; }
+.rules { font-size: 13px; line-height: 1.5; color: var(--muted-fg); margin: 0 0 16px; padding-left: 18px; max-width: 780px; }
+.rules b { color: var(--fg); font-weight: 600; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 20px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.seg button, .chip { font-family: inherit; font-size: 13px; font-weight: 500; color: var(--muted-fg); background: none; border: 0; padding: 8px 12px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"], .chip[aria-pressed="true"] { color: var(--fg); background: var(--line); }
+.chip { border: 1px solid var(--line); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 36px 24px; }
+.cell h2 { font-size: 17px; margin: 0 0 3px; letter-spacing: -.01em; }
+.cell .tag { color: var(--muted-fg); font-size: 13.5px; line-height: 1.45; margin: 0 0 14px; min-height: 40px; }
+.cell dl { margin: 14px 0 0; font-size: 13.5px; line-height: 1.45; }
+.cell dt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-fg); font-weight: 600; margin-top: 10px; }
+.cell dd { margin: 2px 0 0; }
+.cell a { color: inherit; }
+.rec { font-size: 11px; font-weight: 600; color: var(--muted-fg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; margin-left: 6px; vertical-align: 2px; }
+
+.summary { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 18px; max-width: 780px; }
+.summary h2 { font-size: 18px; margin: 0 0 8px; }
+.summary p, .summary li { font-size: 14px; line-height: 1.55; }
+.summary ul { padding-left: 18px; }
+
+/* ---------- Phone ---------- */
+.phone { display: flex; flex-direction: column; align-items: center; }
+.stage { position: relative; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 18px 40px -20px rgba(0,0,0,.35); }
+.screen {
+  position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform-origin: 0 0; overflow: hidden;
+  background: var(--behind); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif; color: var(--ink);
+}
+.layer { position: absolute; inset: 0; transform-origin: 50% 35%; overflow: hidden; }
+.island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; background: #000; border-radius: 20px; z-index: 50; }
+.clock { position: absolute; top: 20px; left: 48px; font-size: 17px; font-weight: 600; z-index: 50; }
+.circle { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: var(--control); display: grid; place-items: center; z-index: 40; color: var(--ink); }
+.close { right: 20px; }
+.toast { position: absolute; left: 0; right: 0; top: 48%; text-align: center; font-size: 15px; font-weight: 500; color: var(--ink3); opacity: 0; pointer-events: none; z-index: 60; }
+.ctrls { display: flex; gap: 8px; margin-top: 12px; }
+.ctrls button { font-family: inherit; font-size: 13px; font-weight: 500; color: var(--muted-fg); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+
+/* The page is the card's paper, full screen: Theme.card with grain. */
+.full, .sheet { position: absolute; background: var(--card); }
+.full { inset: 0; }
+.full::after, .sheet::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: var(--grain-op); border-radius: inherit;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Type: the simplified card's two sizes, plus one small label. */
+.word { font-weight: 700; font-size: 52px; line-height: 60px; letter-spacing: -.01em; margin: 0 0 20px; }
+.big { font-weight: 700; font-size: 32px; line-height: 38px; color: var(--ink3); margin: 0; letter-spacing: -.005em; }
+.lbl { font-weight: 600; font-size: 17px; line-height: 22px; color: var(--ink4); margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+.slot { position: absolute; left: 32px; right: 32px; will-change: transform, opacity, filter; }
+
+/* A · Stories */
+.storybar { position: absolute; top: 56px; left: 16px; right: 16px; display: flex; gap: 4px; z-index: 30; }
+.storybar i { flex: 1; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--ink4) 45%, transparent); overflow: hidden; }
+.storybar b { display: block; height: 100%; background: var(--ink); transform-origin: 0 50%; will-change: transform; }
+.mini { position: absolute; top: 76px; left: 32px; margin: 0; font-size: 17px; font-weight: 600; z-index: 30; }
+.page { position: absolute; left: 0; top: 0; width: 390px; height: 844px; will-change: transform; }
+.tapnote { position: absolute; left: 0; right: 0; bottom: 48px; text-align: center; font-size: 15px; font-weight: 500; color: var(--ink4); margin: 0; z-index: 30; }
+
+/* B · Scroll */
+.clip { position: absolute; inset: 0;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 150px, #000 170px, #000 calc(100% - 90px), transparent calc(100% - 10px));
+          mask-image: linear-gradient(to bottom, transparent 150px, #000 170px, #000 calc(100% - 90px), transparent calc(100% - 10px)); }
+.chev { display: inline-grid; place-items: center; }
+
+/* C · Next */
+.bottom { position: absolute; left: 24px; right: 24px; bottom: 44px; display: flex; gap: 10px; align-items: center; z-index: 20; }
+.back56 { width: 56px; height: 56px; border-radius: 50%; background: var(--control); display: grid; place-items: center; flex: none; transition: opacity .2s, filter .2s, width .3s, margin .3s; }
+.back56.gone { opacity: 0; width: 0; margin-right: -10px; filter: blur(4px); pointer-events: none; }
+.nextpill { flex: 1; height: 56px; border-radius: 28px; background: var(--control); display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 18px; font-weight: 600; overflow: hidden; }
+.nextpill .t { display: block; }
+.segs { position: absolute; left: 24px; right: 24px; bottom: 116px; display: flex; gap: 5px; }
+.segs i { flex: 1; height: 4px; border-radius: 2px; background: var(--ink4); opacity: .35; transition: opacity .25s, background .25s; }
+.segs i.on { background: var(--ink); opacity: 1; }
+
+/* E · Pile */
+.sheet { left: 0; top: 0; width: 390px; height: 812px; border-radius: 54px 54px 40px 40px; transform-origin: 50% 100%;
+  box-shadow: 0 1px 0 rgba(127,127,127,.18), 0 10px 24px -12px var(--lift); will-change: transform, opacity, filter; }
+.sheet .in { position: absolute; left: 32px; right: 32px; top: 88px; will-change: opacity, filter; }
+.sheet .count { position: absolute; left: 0; right: 0; bottom: 30px; text-align: center; font-size: 15px; font-weight: 600; color: var(--ink4); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Word detail: four full-page layouts</h1>
+  <p class="lede">Tapping a card opens the word as a full page, so every layout here uses the whole screen, with no cards inside it. Each one keeps the simplified card's format: the word at 52 pt and one idea at a time in 32 pt bold. Each phone is live: swipe, tap, or use the arrow keys.</p>
+  <ul class="rules">
+    <li><b>Dragging down still closes the page,</b> so moving between chunks is a short sideways swipe or a tap. B is the only one that scrolls vertically, and there dragging down closes the page only from the first chunk.</li>
+    <li><b>Each layout has a signifier:</b> story segments, the next chunk peeking at the bottom, a labelled button, or the edges of a pile.</li>
+  </ul>
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Phone appearance">
+      <button data-theme-btn="" aria-pressed="true">System</button>
+      <button data-theme-btn="light" aria-pressed="false">Light</button>
+      <button data-theme-btn="dark" aria-pressed="false">Dark</button>
+    </div>
+    <button class="chip" id="slow" aria-pressed="false">Slow motion ×4</button>
+  </div>
+
+  <div class="grid">
+    <section class="cell">
+      <h2>A · Stories <span class="rec">recommended</span></h2>
+      <p class="tag">Full pages that slide sideways, with story segments at the top.</p>
+      <div class="phone" data-proto="stories"></div>
+      <dl>
+        <dt>Signifier</dt><dd>Six segments at the top, which everyone reads as "there are more of these". On the first visit, "Tap to continue" sits at the bottom until you move on.</dd>
+        <dt>Gesture</dt><dd>Tap the right of the screen for the next page and the left for the previous one. A short sideways swipe also works and follows your finger.</dd>
+        <dt>Motion</dt><dd>The page slides 1:1 while its text blurs and fades. The segment fills as you swipe. Once the big word leaves, the small "lambent" takes its place at the top.</dd>
+        <dt>References</dt><dd><a href="https://mobbin.com/screens/9c062384-b7ff-4452-8adc-189a7006f309?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Instagram stories</a>, <a href="https://mobbin.com/screens/832a6486-7639-449e-9e6b-93b39c4c667c?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Life Reset ("Tap anywhere to continue")</a>, <a href="https://mobbin.com/screens/329a46cc-cab4-415a-b7be-642ebb759f23?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Oura year in review</a></dd>
+      </dl>
+    </section>
+
+    <section class="cell">
+      <h2>B · Scroll</h2>
+      <p class="tag">The word stays pinned. Chunks scroll up beneath it, and the next one waits at the bottom.</p>
+      <div class="phone" data-proto="scroll"></div>
+      <dl>
+        <dt>Signifier</dt><dd>The next chunk's label and the start of its text sit at the bottom of the page, faded, with a small up chevron.</dd>
+        <dt>Gesture</dt><dd>A short swipe up snaps to the next chunk. Tapping the peek does the same. On the first chunk, dragging down closes the page.</dd>
+        <dt>Motion</dt><dd>The peeking chunk rises into place and sharpens. The current one rises under the word and dissolves.</dd>
+        <dt>References</dt><dd><a href="https://mobbin.com/screens/4dbb8d3a-6d23-4ea8-b0e0-6084e5cb6521?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Deepstash (next card waits at the bottom)</a>, <a href="https://mobbin.com/screens/1674edc0-722d-44b2-83fd-e84c00fc42ae?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Google Photos memories</a>, <a href="https://mobbin.com/screens/13de452f-f189-48d2-8508-c06005b04a60?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Strava "Swipe up for details"</a></dd>
+      </dl>
+    </section>
+
+    <section class="cell">
+      <h2>C · Next</h2>
+      <p class="tag">The word stays put. A big labelled button names what comes next.</p>
+      <div class="phone" data-proto="next"></div>
+      <dl>
+        <dt>Signifier</dt><dd>The button names the next chunk ("In a sentence →"), and progress segments sit above it.</dd>
+        <dt>Gesture</dt><dd>Tap. A short sideways swipe does the same.</dd>
+        <dt>Motion</dt><dd>The text is swapped with a blur replace: the old text rises out of focus and the new text rises into focus. The button's label blurs into the next name.</dd>
+        <dt>References</dt><dd><a href="https://mobbin.com/screens/37b767e5-9e3d-40f0-83c1-9526f913d96e?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">The Outsiders word page</a>, <a href="https://mobbin.com/screens/8b47f8f9-3f47-41a7-9a13-f340f3370334?utm_source=claude-code&utm_medium=ai-assistant&utm_source_platform=mcp">Moonlitt</a></dd>
+      </dl>
+    </section>
+
+    <section class="cell">
+      <h2>E · Pile</h2>
+      <p class="tag">Each chunk is a full page in a pile. Throw the top page away, like on the deck, to see the one under it.</p>
+      <div class="phone" data-proto="pile"></div>
+      <dl>
+        <dt>Signifier</dt><dd>The bottom edges of the pages underneath show below the page, with "1 of 6" on it.</dd>
+        <dt>Gesture</dt><dd>A short swipe either way throws the page off: left goes forward, right goes back. Tapping goes forward.</dd>
+        <dt>Motion</dt><dd>The page stays crisp under your finger and blurs once it is thrown. The page beneath rises from its edge into focus.</dd>
+        <dt>Watch out</dt><dd>It is the deck's own gesture, so people may expect it to move to the next word.</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="summary">
+    <h2>Recommendation: A · Stories</h2>
+    <p>Story segments are the most widely understood way to say "there's more, tap through". Tapping takes no drag at all, so it never competes with the drag down that closes the page. Every page is still a full, simplified card. B is the runner-up if you want reading to feel continuous rather than paged.</p>
+    <h2 style="margin-top:20px">Questions</h2>
+    <ul>
+      <li><b>Chunk order and names.</b> Meaning → in a sentence → also means → similar words → origin → remember it?</li>
+      <li><b>Text that's too long.</b> At 32 pt a page holds about 9 lines. A long definition could step down to 26 pt (like CardFace's <code>minimumScaleFactor</code>), or split across two pages.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+/* ---------------- shared ---------------- */
+const SVG = {
+  x: '<svg width="15" height="15" viewBox="0 0 15 15"><path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  back: '<svg width="10" height="16" viewBox="0 0 10 16"><path d="M8 2L2 8l6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  fwd: '<svg width="10" height="16" viewBox="0 0 10 16"><path d="M2 2l6 6-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  up: '<svg width="14" height="9" viewBox="0 0 14 9"><path d="M2 7l5-5 5 5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+const CH = [
+  { label: 'meaning', body: 'Of light or fire: glowing or flickering softly.' },
+  { label: 'in a sentence', body: '“The lambent flame of the candles.”' },
+  { label: 'also means', body: 'Of wit: lightly brilliant, and never cruel.' },
+  { label: 'similar words', body: 'luminous<br>flickering<br>glowing<br>radiant' },
+  { label: 'origin', body: 'From Latin <i>lambere</i>, “to lick”: a flame that licks without burning.' },
+  { label: 'remember it', body: 'A lamb’s wool, lit by candlelight. Lamb-ent.' },
+];
+const N = CH.length;
+const cap = s => s[0].toUpperCase() + s.slice(1);
+/* One chunk. The first is the deck card's definition; the rest carry a small label. */
+const chunk = (i, extra = '') => i === 0
+  ? `<p class="big">${CH[0].body}</p>`
+  : `<p class="lbl">${CH[i].label}${extra}</p><p class="big">${CH[i].body}</p>`;
+
+let slow = 1;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const c01 = x => clamp(x, 0, 1);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rb = (x, d) => (1 - 1 / (x * 0.55 / d + 1)) * d;
+const rubber = (x, lo, hi, d) => x < lo ? lo - rb(lo - x, d) : x > hi ? hi + rb(x - hi, d) : x;
+
+/* SwiftUI .spring(duration: 0.3, bounce: 0): stiffness (2π/d)², damping 4π/d, mass 1 */
+class Spring {
+  constructor(x, onFrame, duration = 0.3) {
+    this.x = x; this.v = 0; this.target = x; this.onFrame = onFrame; this.raf = 0; this.done = null;
+    const w = 2 * Math.PI / duration; this.k = w * w; this.c = 4 * Math.PI / duration;
+  }
+  to(target, v = this.v, done = null) {
+    this.target = target; this.v = v; this.done = done;
+    if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(t => this.tick(t)); }
+  }
+  set(x) { this.stop(); this.x = this.target = x; this.v = 0; this.onFrame(x); }
+  stop() { cancelAnimationFrame(this.raf); this.raf = 0; this.done = null; }
+  tick(t) {
+    const dt = Math.min((t - this.last) / 1000, 1 / 30) / slow; this.last = t;
+    const steps = Math.ceil(dt / (1 / 240)), h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h; this.x += this.v * h;
+    }
+    const tol = Math.max(1, Math.abs(this.target)) * 1e-3;
+    if (Math.abs(this.x - this.target) < tol && Math.abs(this.v) < tol * 10) {
+      this.x = this.target; this.v = 0; this.raf = 0; this.onFrame(this.x);
+      const d = this.done; this.done = null; d && d(); return;
+    }
+    this.onFrame(this.x);
+    this.raf = requestAnimationFrame(t2 => this.tick(t2));
+  }
+}
+
+const vis = (el, o) => { el.style.visibility = o <= 0.003 ? 'hidden' : 'visible'; el.style.opacity = o.toFixed(3); };
+const blur = (el, b) => { el.style.filter = b > 0.05 ? `blur(${b.toFixed(2)}px)` : 'none'; };
+
+function buildPhone(host) {
+  host.innerHTML = `
+    <div class="stage app">
+      <div class="screen" tabindex="0" aria-label="Live prototype: swipe, tap, or use the arrow keys">
+        <div class="layer"></div>
+        <div class="island"></div><div class="clock">9:41</div>
+        <div class="toast">Closed (back to the deck)</div>
+      </div>
+    </div>
+    <div class="ctrls"><button data-step="-1">Previous</button><button data-step="1">Next</button><button data-reset>Reset</button></div>`;
+  const stage = host.querySelector('.stage'), screen = host.querySelector('.screen');
+  const layer = host.querySelector('.layer'), toast = host.querySelector('.toast');
+  const ph = { host, stage, screen, layer, toast, scale: 0.7 };
+  ph.fit = () => {
+    const w = host.clientWidth || 300;
+    const s = Math.min(0.72, w / 390);
+    stage.style.width = 390 * s + 'px'; stage.style.height = 844 * s + 'px'; stage.style.borderRadius = 54 * s + 'px';
+    screen.style.transform = `scale(${s})`; ph.scale = s;
+  };
+  ph.addClose = (top = 58) => layer.insertAdjacentHTML('beforeend', `<div class="circle close" data-act="close" style="top:${top}px">${SVG.x}</div>`);
+  /* The zoom transition's interactive dismiss: the page shrinks back toward the deck. */
+  ph.preview = a => { a = c01(a); layer.style.transform = a ? `translateY(${a * 70}px) scale(${1 - a * 0.16})` : ''; layer.style.borderRadius = a ? '54px' : ''; };
+  ph.release = () => {
+    const from = layer.style.transform; if (!from) return;
+    layer.style.transform = ''; layer.style.borderRadius = '';
+    layer.animate([{ transform: from, borderRadius: '54px' }, { transform: 'none', borderRadius: '0px' }], { duration: 300 * slow, easing: 'cubic-bezier(.2,.9,.25,1)' });
+  };
+  ph.busy = false;
+  ph.dismiss = reset => {
+    if (ph.busy) return; ph.busy = true;
+    const from = layer.style.transform || 'none';
+    layer.style.borderRadius = '54px';
+    layer.animate([{ transform: from, opacity: 1, filter: 'blur(0)' }, { transform: 'translateY(100px) scale(.5)', opacity: 0, filter: 'blur(6px)' }],
+      { duration: 280 * slow, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+    toast.animate([{ opacity: 0 }, { opacity: 1, offset: .3 }, { opacity: 1, offset: .75 }, { opacity: 0 }], { duration: 1100 * slow });
+    setTimeout(() => {
+      layer.getAnimations().forEach(a => a.cancel());
+      layer.style.transform = ''; layer.style.borderRadius = ''; reset();
+      layer.animate([{ transform: 'scale(.9)', opacity: 0, filter: 'blur(6px)' }, { transform: 'none', opacity: 1, filter: 'blur(0)' }],
+        { duration: 320 * slow, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      ph.busy = false;
+    }, 1100 * slow);
+  };
+  addEventListener('resize', ph.fit);
+  ph.fit();
+  return ph;
+}
+
+/* Pointer input in phone points: axis-locked drags, release velocity, taps (with where), keys
+   and buttons. A downward drag the layout doesn't claim previews the close, and closes past 140 pt. */
+function input(ph, h) {
+  const el = ph.screen;
+  let id = null, x0, y0, t0, target, axis, samples;
+  el.addEventListener('pointerdown', e => {
+    if (e.button || ph.busy) return;
+    id = e.pointerId; el.setPointerCapture(id);
+    x0 = e.clientX; y0 = e.clientY; t0 = e.timeStamp; target = e.target; axis = null;
+    samples = [[e.timeStamp, e.clientX, e.clientY]];
+    h.start && h.start();
+  });
+  el.addEventListener('pointermove', e => {
+    if (e.pointerId !== id) return;
+    const dx = (e.clientX - x0) / ph.scale, dy = (e.clientY - y0) / ph.scale;
+    samples.push([e.timeStamp, e.clientX, e.clientY]);
+    while (samples.length > 2 && e.timeStamp - samples[0][0] > 90) samples.shift();
+    if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (!axis) return;
+    if (axis === 'y' && !(h.claimsY && h.claimsY(dy))) { ph.preview(Math.max(0, dy) / 320); return; }
+    h.move && h.move(dx, dy, axis);
+  });
+  const up = e => {
+    if (e.pointerId !== id) return;
+    id = null;
+    const dx = (e.clientX - x0) / ph.scale, dy = (e.clientY - y0) / ph.scale;
+    const [ta, xa, ya] = samples[0], [tb, xb, yb] = samples[samples.length - 1];
+    const sec = Math.max((tb - ta) / 1000, 1e-3);
+    const vx = (xb - xa) / ph.scale / sec, vy = (yb - ya) / ph.scale / sec;
+    if (!axis) {
+      if (e.timeStamp - t0 < 400) {
+        if (target.closest('[data-act="close"]')) return ph.dismiss(h.reset);
+        const r = el.getBoundingClientRect();
+        h.tap && h.tap(target, (e.clientX - r.left) / ph.scale);
+      }
+      return;
+    }
+    if (axis === 'y' && !(h.claimsY && h.claimsY(dy))) {
+      if (dy > 140 || (dy > 50 && vy > 900)) ph.dismiss(h.reset); else ph.release();
+      return;
+    }
+    h.end && h.end(dx, dy, vx, vy, axis);
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  let cool = 0;
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    const now = performance.now(), d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (now < cool || Math.abs(d) < 4 || ph.busy) return;
+    cool = now + 450 * Math.max(1, slow / 2);
+    h.step(d > 0 ? 1 : -1);
+  }, { passive: false });
+  el.addEventListener('keydown', e => {
+    const k = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (k && !ph.busy) { e.preventDefault(); h.step(k); }
+  });
+  ph.host.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => !ph.busy && h.step(+b.dataset.step)));
+  ph.host.querySelector('[data-reset]').addEventListener('click', () => h.reset());
+}
+
+/* Two-state blur replace between slots: the old one rises out of focus, the new one rises in. */
+function crossfader(els, onDraw) {
+  let from = 0, to = 0, t = 1;
+  const draw = () => {
+    const dir = to >= from ? 1 : -1;
+    els.forEach((el, i) => {
+      let o = 0, y = 0, b = 0;
+      if (i === to) { o = t; y = (1 - t) * 18 * dir; b = (1 - t) * 8; }
+      else if (i === from) { o = 1 - t; y = -t * 18 * dir; b = t * 8; }
+      vis(el, o); blur(el, b); el.style.transform = `translate3d(0,${y.toFixed(2)}px,0)`;
+    });
+    onDraw && onDraw(from, to, t);
+  };
+  const sp = new Spring(1, v => { t = v; draw(); });
+  const api = {
+    get at() { return to; },
+    go(n) { if (n === to) return; from = to; to = n; sp.set(0); sp.to(1); },
+    jump(n) { from = to = n; sp.set(1); },
+  };
+  draw();
+  return api;
+}
+
+/* ---------------- A · Stories ---------------- */
+function Stories(host) {
+  const ph = buildPhone(host);
+  ph.layer.insertAdjacentHTML('afterbegin', `
+    <div class="full"></div>
+    ${CH.map((c, i) => `<div class="page"><div class="slot" style="top:112px">${i === 0 ? '<p class="word">lambent</p>' : ''}${chunk(i)}</div></div>`).join('')}
+    <div class="storybar">${CH.map(() => '<i><b></b></i>').join('')}</div>
+    <p class="mini">lambent</p>
+    <p class="tapnote">Tap to continue</p>`);
+  ph.addClose(70);
+  const pages = [...ph.layer.querySelectorAll('.page')], texts = pages.map(p => p.firstElementChild);
+  const fills = [...ph.layer.querySelectorAll('.storybar b')];
+  const mini = ph.layer.querySelector('.mini'), note = ph.layer.querySelector('.tapnote');
+  let x = 0, x0 = 0, base = 0, seen = false;
+  const render = () => {
+    pages.forEach((pg, i) => {
+      const d = i - x;
+      if (Math.abs(d) >= 1) { pg.style.visibility = 'hidden'; return; }
+      pg.style.visibility = 'visible';
+      pg.style.transform = `translate3d(${(d * 390).toFixed(2)}px,0,0)`;
+      texts[i].style.opacity = (1 - Math.abs(d) * 0.9).toFixed(3); blur(texts[i], Math.abs(d) * 8);
+    });
+    fills.forEach((f, i) => { f.style.transform = `scaleX(${c01(x + 1 - i).toFixed(4)})`; });
+    mini.style.opacity = c01(x * 1.5).toFixed(3); blur(mini, (1 - c01(x * 1.5)) * 4);
+    if (x > 0.5) seen = true;
+    note.style.opacity = seen ? 0 : (1 - c01(x * 2)).toFixed(3);
+  };
+  const sp = new Spring(0, v => { x = v; render(); });
+  const api = {
+    start() { sp.stop(); x0 = x; base = Math.round(x); },
+    move(dx) { sp.set(rubber(x0 - dx / 390, 0, N - 1, 0.2)); },
+    end(dx, dy, vx) {
+      const v = -vx / 390;
+      sp.to(clamp(clamp(Math.round(x + v * 0.15), base - 1, base + 1), 0, N - 1), clamp(v, -6, 6));
+    },
+    tap(t, px) { api.step(px < 130 ? -1 : 1); },
+    step(d) {
+      const cur = Math.round(sp.target);
+      if (cur === N - 1 && d > 0) return ph.dismiss(api.reset);   // tapping past the end goes back to the deck
+      sp.to(clamp(cur + d, 0, N - 1));
+    },
+    reset() { sp.set(0); },
+  };
+  input(ph, api); render();
+  return ph;
+}
+
+/* ---------------- B · Scroll ---------------- */
+function Scroll(host) {
+  const ph = buildPhone(host);
+  const TOP = 168, PEEK = 728, P = PEEK - TOP;
+  ph.layer.insertAdjacentHTML('afterbegin', `
+    <div class="full"></div>
+    <p class="word slot" style="top:88px;margin:0">lambent</p>
+    <div class="clip">${CH.map((c, i) => `<div class="slot chunk" data-i="${i}" style="top:0">${chunk(i, `<span class="chev">${SVG.up}</span>`)}</div>`).join('')}</div>`);
+  ph.addClose();
+  const els = [...ph.layer.querySelectorAll('.chunk')];
+  const parts = els.map(el => ({ big: el.querySelector('.big'), lbl: el.querySelector('.lbl'), chev: el.querySelector('.chev') }));
+  let y = 0, y0 = 0, base = 0;
+  const render = () => {
+    els.forEach((el, i) => {
+      const d = i - y, top = TOP + d * P;
+      if (top > 844 || d <= -1) { el.style.visibility = 'hidden'; return; }
+      el.style.visibility = 'visible';
+      el.style.transform = `translate3d(0,${top.toFixed(2)}px,0)`;
+      const { big, lbl, chev } = parts[i];
+      if (d >= 0) {
+        // Waiting at the bottom: the label is sharp (the signifier); the text is faint.
+        el.style.opacity = 1; blur(el, 0);
+        big.style.opacity = lerp(1, 0.3, c01(d)).toFixed(3);
+        if (chev) chev.style.opacity = c01(d * 1.5).toFixed(3);
+      } else {
+        el.style.opacity = (1 - c01(-d * 1.6)).toFixed(3); blur(el, c01(-d) * 8);
+        big.style.opacity = 1;
+        if (chev) chev.style.opacity = 0;
+      }
+    });
+  };
+  const sp = new Spring(0, v => { y = v; render(); });
+  const api = {
+    claimsY: dy => !(base === 0 && dy > 0),   // on the first chunk, down belongs to close
+    start() { sp.stop(); y0 = y; base = Math.round(y); },
+    move(dx, dy, axis) { if (axis === 'y') sp.set(rubber(y0 - dy / P, 0, N - 1, 0.2)); },
+    end(dx, dy, vx, vy, axis) {
+      if (axis !== 'y') return;
+      const v = -vy / P;
+      sp.to(clamp(clamp(Math.round(y + v * 0.15), base - 1, base + 1), 0, N - 1), clamp(v, -6, 6));
+    },
+    tap(t) { const c = t.closest('.chunk'); if (c && +c.dataset.i > Math.round(y)) sp.to(Math.round(y) + 1); },
+    step(d) {
+      const cur = Math.round(sp.target);
+      if (cur === 0 && d < 0) return ph.dismiss(api.reset);
+      sp.to(clamp(cur + d, 0, N - 1));
+    },
+    reset() { sp.set(0); },
+  };
+  input(ph, api); render();
+  return ph;
+}
+
+/* ---------------- C · Next ---------------- */
+function Next(host) {
+  const ph = buildPhone(host);
+  ph.layer.insertAdjacentHTML('afterbegin', `
+    <div class="full"></div>
+    <p class="word slot" style="top:88px;margin:0">lambent</p>
+    ${CH.map((c, i) => `<div class="slot chunk" style="top:168px">${chunk(i)}</div>`).join('')}
+    <div class="segs">${CH.map(() => '<i></i>').join('')}</div>
+    <div class="bottom">
+      <div class="back56 gone" data-act="prev">${SVG.back}</div>
+      <div class="nextpill" data-act="next"><span class="t"></span>${SVG.fwd}</div>
+    </div>`);
+  ph.addClose();
+  const slots = [...ph.layer.querySelectorAll('.chunk')];
+  const segs = [...ph.layer.querySelectorAll('.segs i')];
+  const back = ph.layer.querySelector('.back56'), label = ph.layer.querySelector('.nextpill .t');
+  const setChrome = i => {
+    segs.forEach((s, k) => s.classList.toggle('on', k <= i));
+    back.classList.toggle('gone', i === 0);
+    const text = i < N - 1 ? cap(CH[i + 1].label) : 'Back to the deck';
+    if (label.textContent !== text) {
+      label.textContent = text;
+      label.animate([{ opacity: 0, filter: 'blur(4px)', transform: 'translateY(6px)' }, { opacity: 1, filter: 'blur(0)', transform: 'none' }], { duration: 260 * slow, easing: 'ease-out' });
+    }
+  };
+  const cf = crossfader(slots);
+  const go = i => { i = clamp(i, 0, N - 1); cf.go(i); setChrome(i); };
+  const api = {
+    end(dx, dy, vx, vy, axis) { if (axis === 'x' && (Math.abs(dx) > 40 || Math.abs(vx) > 300)) api.step(dx < 0 ? 1 : -1); },
+    tap(t) {
+      if (t.closest('[data-act="next"]')) return cf.at === N - 1 ? ph.dismiss(api.reset) : go(cf.at + 1);
+      if (t.closest('[data-act="prev"]')) return go(cf.at - 1);
+    },
+    step(d) { go(cf.at + d); },
+    reset() { cf.jump(0); setChrome(0); },
+  };
+  input(ph, api); api.reset();
+  return ph;
+}
+
+/* ---------------- E · Pile ---------------- */
+function Pile(host) {
+  const ph = buildPhone(host);
+  const E1 = 12, E2 = 24;
+  ph.layer.insertAdjacentHTML('afterbegin',
+    CH.map((c, i) => `<div class="sheet"><div class="in"><p class="word">lambent</p>${chunk(i)}</div><div class="count">${i + 1} of ${N}</div></div>`).join(''));
+  ph.addClose();
+  const sheets = [...ph.layer.querySelectorAll('.sheet')], ins = sheets.map(s => s.querySelector('.in'));
+  const counts = sheets.map(s => s.querySelector('.count'));
+  let idx = 0, x = 0, throwing = false;
+  const place = (i, { tx = 0, y = 0, s = 1, o = 1, b = 0, co = 1, cb = 0, z = 0 }) => {
+    const el = sheets[i];
+    if (o <= 0.003) { el.style.visibility = 'hidden'; return; }
+    el.style.visibility = 'visible'; el.style.zIndex = z;
+    el.style.transform = `translate3d(${tx.toFixed(2)}px,${y.toFixed(2)}px,0) scale(${s.toFixed(4)})`;
+    el.style.opacity = o.toFixed(3); blur(el, b);
+    ins[i].style.opacity = co.toFixed(3); blur(ins[i], cb); counts[i].style.opacity = co.toFixed(3);
+  };
+  const render = () => {
+    const dir = x < 0 ? 1 : x > 0 ? -1 : 0;
+    const q = c01(Math.abs(x) / 280);
+    sheets.forEach((_, i) => place(i, { o: 0 }));
+    // At rest only the bottom edges of the next two pages show under this one.
+    if (dir === 1) {
+      if (idx + 1 < N) place(idx + 1, { y: lerp(E1, 0, q), s: lerp(0.96, 1, q), co: q, cb: (1 - q) * 6, z: 9 });
+      if (idx + 2 < N) place(idx + 2, { y: lerp(E2, E1, q), s: lerp(0.92, 0.96, q), co: 0, z: 8 });
+      if (idx + 3 < N) place(idx + 3, { y: E2, s: 0.92, co: 0, o: q, z: 7 });
+    } else {
+      if (idx + 1 < N) place(idx + 1, { y: E1, s: 0.96, co: 0, z: 8 });
+      if (idx + 2 < N) place(idx + 2, { y: E2, s: 0.92, co: 0, z: 7 });
+      if (dir === -1 && idx > 0) place(idx - 1, { y: lerp(E1, 0, q), s: lerp(0.96, 1, q), o: q, co: q, cb: (1 - q) * 6, z: 9 });
+    }
+    // The dragged page stays crisp under the finger and blurs only once thrown.
+    const away = c01((Math.abs(x) - 60) / 320);
+    place(idx, { tx: x, o: throwing ? 1 - away : 1, b: throwing ? away * 8 : 0, z: 10 });
+  };
+  const sp = new Spring(0, v => { x = v; render(); });
+  const canGo = d => idx + d >= 0 && idx + d < N;
+  const fling = (d, v = 0) => {
+    if (!canGo(d) || throwing) return;
+    throwing = true;
+    sp.to(-d * 600, v, () => { idx += d; throwing = false; sp.set(0); });
+  };
+  const api = {
+    start() { if (!throwing) sp.stop(); },
+    move(dx, dy, axis) {
+      if (axis !== 'x' || throwing) return;
+      sp.set(canGo(dx < 0 ? 1 : -1) ? dx : Math.sign(dx) * rb(Math.abs(dx), 50));
+    },
+    end(dx, dy, vx, vy, axis) {
+      if (axis !== 'x' || throwing) return;
+      const d = dx < 0 ? 1 : -1;
+      if (canGo(d) && (Math.abs(dx) > 90 || (Math.abs(vx) > 500 && Math.sign(vx) === Math.sign(dx)))) fling(d, vx);
+      else sp.to(0, vx);
+    },
+    tap(t) { if (t.closest('.sheet')) fling(1); },
+    step(d) { fling(d); },
+    reset() { throwing = false; idx = 0; sp.set(0); },
+  };
+  input(ph, api); render();
+  return ph;
+}
+
+/* ---------------- page wiring ---------------- */
+const phones = [
+  Stories(document.querySelector('[data-proto="stories"]')),
+  Scroll(document.querySelector('[data-proto="scroll"]')),
+  Next(document.querySelector('[data-proto="next"]')),
+  Pile(document.querySelector('[data-proto="pile"]')),
+];
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-theme-btn]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  document.querySelectorAll('.app').forEach(a => b.dataset.themeBtn ? a.setAttribute('data-theme', b.dataset.themeBtn) : a.removeAttribute('data-theme'));
+}));
+const slowBtn = document.getElementById('slow');
+slowBtn.addEventListener('click', () => { const on = slowBtn.getAttribute('aria-pressed') !== 'true'; slowBtn.setAttribute('aria-pressed', on); slow = on ? 4 : 1; });
+</script>
+</body>
+</html>

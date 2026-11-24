@@ -6,19 +6,29 @@ struct DeckView: View {
     @Query(sort: \Word.createdAt, order: .reverse) private var allWords: [Word]
     @Query(filter: #Predicate<WordCollection> { $0.isFavorites }) private var favorites: [WordCollection]
 
-    @State private var collection: WordCollection?
+    /// All words or one collection, opened from the menu; nil is the home deck.
+    @State private var scope: DeckScope?
     @State private var index = 0
     @State private var offset: CGSize = .zero
     @State private var showSearch = false
     /// A word picked in Search, open in the pushback sheet over it.
     @State private var searchPick: SearchPick?
+    /// The question in the Ask panel under the parked Search sheet.
+    @State private var searchQuestion: String?
+    /// Search is swiped up, parked at the top over its Ask panel.
+    @State private var searchParked = false
     /// A question the word sheet sends back to Search.
     @State private var searchAsk: String?
     @State private var collectWord: Word?
     @State private var showCollections = false
+    /// The Collections page is open in the menu (debug hook).
+    @State private var menuOnCollections = false
     /// Ask AI is open: the card is parked at the top and the panel sits under it.
     @State private var askOpen = false
-    @State private var studyCollection: WordCollection?
+    /// A spaced-repetition session over the open scope; nil on the normal deck.
+    @State private var study: StudySession?
+    /// The study card on top is turned over to its answer.
+    @State private var flipped = false
     @State private var detailWord: Word?
     @Namespace private var cardZoom
     @State private var safeTop: CGFloat = 0
@@ -55,15 +65,27 @@ struct DeckView: View {
     /// One heart per favorite, each with its own timeline, so a second favorite never
     /// yanks a heart that is still in flight back to the row.
     @State private var bursts: [UUID] = []
+    /// The word just favorited: its card's corner heart waits until the burst has landed.
+    @State private var heartHeld: PersistentIdentifier?
+    /// The search button's fill, chosen in the menu.
+    @AppStorage("accent") private var accentRaw = Accent.ink.rawValue
     /// Favorite was tapped and the card is holding for the heart's pop; the rows are done.
     @State private var rowsDone = false
     /// A completed delete: the rows stay fully revealed (not tied to the card, which has
     /// gone) and `rowsGone` fades them out with the card's copy, on its curve.
     @State private var rowsLeaving = false
     @State private var rowsGone = false
-    /// Centre of the Favorite row's heart icon, from the row's centre. The burst starts here.
-    @State private var heartIconX: CGFloat = 0
+    /// Centre of the Favorite button's heart icon in the action row. The burst starts here.
+    @State private var heartIconMidX: CGFloat = 0
     @State private var rowWidth: CGFloat = 0
+    /// The pull down has passed the collect threshold (see `SwipeCard.armHaptic`).
+    @State private var collectArmed = false
+    /// A committed pull down: the bookmark holds where it was at release and fades
+    /// out, instead of retreating with the card the way a cancelled pull does.
+    @State private var collectHold: CollectHold?
+    @State private var collectGone = false
+    @State private var toaster = Toaster()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private static let rowSpace = "actionRow"
     /// How long the lifted card waits after a favorite: until the heart's pop peaks, so
     /// you see the cause before the card covers it. It then descends as the heart rises.
@@ -74,18 +96,17 @@ struct DeckView: View {
     /// Space between the parked card and the top of the Ask sheet.
     private let askGap: CGFloat = 12
     private let deleteHeight: CGFloat = 56
-    /// Between the rows, and between the top row and the lifted card.
+    /// Between the Favorite and Delete buttons.
     private let rowGap: CGFloat = 12
-    /// How far a long press lifts the card: the Favorite and Delete rows and their gaps.
-    private var deleteLift: CGFloat { deleteHeight * 2 + rowGap * 2 }
+    /// Between the lifted card and the buttons: a little more than between the buttons,
+    /// so the pair reads as one row apart from the card.
+    private let liftGap: CGFloat = 16
+    /// How far a long press lifts the card: the Favorite | Delete row and its gap.
+    private var deleteLift: CGFloat { deleteHeight + liftGap }
 
     private var words: [Word] {
-        var base = allWords
-        if let collection {
-            let id = collection.persistentModelID
-            base = base.filter { $0.collections.contains { $0.persistentModelID == id } }
-        }
-        return base
+        if let study { return study.queue }
+        return scope?.words(from: allWords) ?? allWords
     }
 
     var body: some View {
@@ -99,53 +120,76 @@ struct DeckView: View {
                 askPanel(word: panelWord(words: words, i: i))
                     .task(id: words[i].persistentModelID) { await syncPanelWhenIdle(words[i]) }
             }
-            if showSearch {
-                SearchView(onClose: closeSearch, pick: $searchPick, askRequest: $searchAsk)
-                    // The deck stays still; Search fades over it. Exits run faster than entrances.
-                    .transition(.asymmetric(insertion: .opacity.animation(.strongEaseOut(0.25)),
-                                            removal: .opacity.animation(.strongEaseOut(0.18))))
-                    .zIndex(1)
-            }
         }
         .background(Theme.page.ignoresSafeArea())
-        .bottomSheet(item: $searchPick, size: .medium) { pick in
+        // Search uses the same medium sheet as Save to, and swipes up like a deck card
+        // into the same Ask panel. The picked word's sheet is applied after it, so it
+        // stacks over Search (parked or not) and pushes it back.
+        .bottomSheet(isPresented: $showSearch, size: .medium, parked: $searchParked) {
+            SearchView(onClose: closeSearch, pick: $searchPick, question: $searchQuestion,
+                       parked: $searchParked, askRequest: $searchAsk)
+        } under: { park in
+            AskPanel(word: nil, opening: searchQuestion, revealed: park.revealed,
+                     onPull: park.pull, onPullEnd: park.release, onClose: park.close,
+                     onPick: { searchPick = $0 })
+                .equatable()
+        }
+        // A word the AI suggested opens in the word sheet, with its reason.
+        .bottomSheet(item: aiPick, size: .medium) { pick in
             WordSheet(pick: pick) { searchAsk = $0 }
         }
-        .bottomSheet(item: $collectWord, size: .medium) { AddToCollectionView(word: $0) }
-        .sheet(isPresented: $showCollections) {
-            CollectionsView(selected: $collection) { c in
-                showCollections = false
-                studyCollection = c
-            }
+        // A word typed in Search forms over everything as the card it would become.
+        .pageOverlay(item: searchPick?.note == nil ? searchPick : nil) { pick in
+            SearchWordStage(pick: pick, onAsk: { searchAsk = $0 }, onDone: { searchPick = nil },
+                            // Drops in once the card has cleared the top edge, so the two never cross.
+                            onSaved: { toaster.show("Word saved", after: 0.2) })
         }
+        // A closed Search starts fresh next time.
+        .onChange(of: showSearch) { _, shown in
+            if !shown { searchQuestion = nil; searchParked = false }
+        }
+        .bottomSheet(item: $collectWord, size: .tall) { AddToCollectionView(word: $0) }
+        .bottomSheet(isPresented: $showCollections, size: .tall) {
+            MenuView(selected: $scope, startOnCollections: menuOnCollections)
+        }
+        .onChange(of: showCollections) { _, shown in if !shown { menuOnCollections = false } }
         .fullScreenCover(item: $detailWord) { word in
             WordDetailView(word: word)
                 .navigationTransition(.zoom(sourceID: word.text, in: cardZoom))
         }
-        .fullScreenCover(item: $studyCollection) { StudyView(collection: $0) }
-        .onChange(of: collection) { index = 0 }
+        .onChange(of: scope) { index = 0 }
         .task {
-            WordCollection.ensureFavorites(in: context)
+            WordCollection.ensureDefaults(in: context)
             await debugHooks()
         }
+        // Outermost, so hoisted overlays (forming cards, confirmations) sit above the
+        // sheets and fog the whole page, sheets included.
+        .pageOverlayHost()
+        // Above the fog: a confirmation is never behind what it confirms.
+        .toastHost(toaster)
     }
 
     private func deck(words: [Word], i: Int) -> some View {
         VStack(spacing: 18) {
-            Text(caption(count: words.count, i: i))
-                .font(.footnote.weight(.medium)).foregroundStyle(.ink3)
-                .contentTransition(.numericText())
+            topChrome
+                .opacity(1 - askProgress)
+                .backdropFaded(liftProgress)
+                .allowsHitTesting(!askOpen && !deleteOpen)
 
             GeometryReader { geo in
                 ZStack {
-                    gestureHints
+                    gestureHints(in: geo.size)
                     // While the card is lifted, a tap anywhere around it puts it back.
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture(perform: closeDelete)
                         .allowsHitTesting(deleteOpen)
                         .accessibilityHidden(true)
-                    if words.isEmpty {
+                    if let study, study.queue.isEmpty {
+                        studyDoneCard(study)
+                            .frame(height: cardHeight(geo.size))
+                            .transition(.rise(from: 0))
+                    } else if words.isEmpty {
                         emptyCard.frame(height: cardHeight(geo.size))
                     } else {
                         let width = geo.size.width
@@ -160,20 +204,24 @@ struct DeckView: View {
                         SwipeCard(offset: $offset, allowed: allowed(words: words, i: i),
                                   flyOff: [], handOff: [.left, .right],
                                   park: [.up: askParkDistance],
+                                  armHaptic: [.down],
+                                  onArmChange: { collectArmed = $0 },
                                   parked: askOpen || deleteOpen,
                                   onUnpark: unpark,
                                   onTap: { tapCard(words[i]) },
-                                  onLongPress: openDelete,
+                                  onLongPress: longPress,
                                   onHandOff: { dir, v in flip(dir, velocity: v, words: words, i: i, width: width) }) { dir in
                             handle(dir, words: words, i: i)
                         } content: {
-                            CardFace(word: words[i])
+                            face(words[i], flipped: flipped)
                             .matchedTransitionSource(id: words[i].text, in: cardZoom) {
-                                $0.background(Theme.card).clipShape(Theme.cardShape)
+                                // A study card turns over: a fixed backing here would stay put behind it.
+                                $0.background(study == nil ? Theme.card : .clear).clipShape(Theme.cardShape)
                             }
                         }
-                        .accessibilityHint(askOpen ? "Closes Ask AI" : deleteOpen ? "Hides delete" : "Shows all definitions")
-                        .accessibilityAction(named: "Delete") { openDelete() }
+                        .accessibilityHint(askOpen ? "Closes Ask AI" : deleteOpen ? "Hides delete"
+                                           : study != nil ? "Turns the card over" : "Shows all definitions")
+                        .accessibilityAction(named: "Delete") { if study == nil { openDelete() } }
                         .frame(height: cardHeight(geo.size))
                         // After a throw the new top card arrives already risen to where the
                         // card under the finger was, and finishes coming into focus on the
@@ -182,7 +230,7 @@ struct DeckView: View {
                         // Outside `.id`, or SwiftUI ignores it when the id changes.
                         .transition(.asymmetric(insertion: .rise(from: riseFrom, simple: riseSimple, delay: riseDelay), removal: .identity))
                         ForEach(flying) { card in
-                            CardFace(word: card.word)
+                            face(card.word, flipped: card.flipped)
                                 .frame(height: cardHeight(geo.size))
                                 .allowsHitTesting(false)
                                 .accessibilityHidden(true)
@@ -191,17 +239,16 @@ struct DeckView: View {
                                 .transition(.asymmetric(insertion: .thrown(from: card.from - card.to, fades: !card.simple), removal: .identity))
                         }
                         vanishingCard(height: cardHeight(geo.size))
-                        // Starts on the Favorite row's centre and flies over everything.
+                        // Starts on the Favorite button's heart and flies over everything.
                         ZStack {
                             ForEach(bursts, id: \.self) { _ in
-                                HeartBurst(iconX: heartIconX, travel: cardArea.maxY + 120, lead: heartHold)
+                                HeartBurst(iconX: heartIconMidX - rowWidth / 2, travel: cardArea.maxY + 120, lead: heartHold)
                                     // Its keyframes are the whole entrance and exit.
                                     .transition(.identity)
                             }
                         }
                             .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.6), trigger: hearts)
                             .frame(height: deleteHeight)
-                            .padding(.bottom, deleteHeight + rowGap)
                             .frame(height: cardHeight(geo.size), alignment: .bottom)
                             .allowsHitTesting(false)
                             .accessibilityHidden(true)
@@ -218,8 +265,9 @@ struct DeckView: View {
                 if new == .zero && !deleteOpen && !rowsLeaving { deleteShown = false }
             }
 
-            bottomBar
+            bottomChrome(count: words.count, i: i)
                 .opacity(1 - askProgress)
+                .backdropFaded(liftProgress)
                 .allowsHitTesting(!askOpen && !deleteOpen)
         }
         .padding(.horizontal, 24)
@@ -248,6 +296,18 @@ struct DeckView: View {
         return Double(min(1, max(0, -offset.height / askParkDistance)))
     }
 
+    /// 0 at rest, 1 with the card lifted by a long press. The menu, counter and add button
+    /// recede behind it with the sheets' backdrop (`backdropFaded`), so the card and its
+    /// Favorite | Delete row are the focus; they're all that's behind it on the page.
+    /// Derived from the lift, so it tracks the card however it moves. After a delete the
+    /// card's offset is reset at once, so it follows the rows' fade (`rowsGone`) instead,
+    /// on the delete's curve.
+    private var liftProgress: Double {
+        if rowsLeaving { return rowsGone ? 0 : 1 }
+        if deleteShown { return Double(min(1, max(0, -offset.height / deleteLift))) }
+        return 0
+    }
+
     /// Hangs off the card's bottom edge: it is laid out at its open position and
     /// pushed down by however far the card still has to travel, so the card carries it.
     private func askPanel(word: Word) -> some View {
@@ -272,23 +332,25 @@ struct DeckView: View {
         let y: CGFloat
     }
 
-    /// Favorite over Delete, lying under the card's bottom edge and uncovered as the
-    /// card lifts: Delete first, then Favorite. Each row's focus (opacity, blur, scale)
+    /// Favorite and Delete side by side in one row under the card's bottom edge,
+    /// uncovered together as the card lifts. The row's focus (opacity, blur, scale)
     /// is derived from the card's offset, so it stays in step whether the card is
     /// springing, being dragged back, or interrupted.
     private func deleteButton(_ word: Word) -> some View {
         let favorite = word.collections.contains { $0.isFavorites }
-        return VStack(spacing: rowGap) {
+        return HStack(spacing: rowGap) {
             actionRow(favorite ? "Favorited" : "Favorite", systemImage: favorite ? "heart.fill" : "heart",
                       // Delete's tint treatment in grey, tinted with the ink itself (.gray barely
                       // shifts a light page). It stays tinted once favorited: the filled heart says it.
-                      ink: .ink, fill: Color.ink.opacity(0.16),
-                      row: 1) { toggleFavorite(word) }
+                      ink: .ink, fill: Color.ink.opacity(0.16)) { toggleFavorite(word) }
                 .accessibilityLabel(favorite ? "Remove \(word.text) from Favorites" : "Add \(word.text) to Favorites")
             HoldToDelete(height: deleteHeight) { delete(word) }
                 .modifier(rowReveal(row: 0))
                 .accessibilityLabel("Delete \(word.text)")
         }
+        // The burst is laid out across this full row, so the heart is measured from its centre.
+        .coordinateSpace(.named(Self.rowSpace))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
         // Leaves with the deleted card's copy: same fade, blur and slight sink.
         .opacity(rowsGone ? 0 : 1)
         .blur(radius: rowsGone ? 8 : 0)
@@ -298,13 +360,13 @@ struct DeckView: View {
     }
 
     private func actionRow(_ title: String, systemImage: String, ink: Color, fill: Color,
-                           row: Int, action: @escaping () -> Void) -> some View {
+                           action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: systemImage)
                     .contentTransition(.symbolEffect(.replace))
                     .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.rowSpace)).midX } action: { x in
-                        if row == 1 { heartIconX = x - rowWidth / 2 }
+                        heartIconMidX = x
                     }
                 Text(title)
             }
@@ -312,25 +374,23 @@ struct DeckView: View {
                 .foregroundStyle(ink)
                 .frame(maxWidth: .infinity)
                 .frame(height: deleteHeight)
-                .background(fill, in: Theme.actionShape)
-                .contentShape(Theme.actionShape)
-                .coordinateSpace(.named(Self.rowSpace))
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
+                .background(fill, in: Theme.cardActionShape)
+                .contentShape(Theme.cardActionShape)
         }
         .buttonStyle(PressStyle(pressedScale: 0.97))
-        .modifier(rowReveal(row: row))
+        .modifier(rowReveal(row: 0))
     }
 
     /// `row` counts up from the card's bottom edge, the order the lift uncovers them.
     private func rowReveal(row: Int) -> RowReveal {
         if rowsLeaving { return RowReveal(p: 1) }
-        let start = CGFloat(row) * (deleteHeight + rowGap)
-        return RowReveal(p: min(1, max(0, (-offset.height - start) / (deleteHeight + rowGap))))
+        let start = CGFloat(row) * (deleteHeight + liftGap)
+        return RowReveal(p: min(1, max(0, (-offset.height - start) / (deleteHeight + liftGap))))
     }
 
     /// Fills the heart, then puts the card back; the change shows as it slides over.
     private func toggleFavorite(_ word: Word) {
-        WordCollection.ensureFavorites(in: context)
+        WordCollection.ensureDefaults(in: context)
         guard let fav = favorites.first ?? (try? context.fetch(FetchDescriptor<WordCollection>(
             predicate: #Predicate { $0.isFavorites })))?.first else { return }
         let adding = !word.collections.contains { $0.isFavorites }
@@ -341,11 +401,19 @@ struct DeckView: View {
                 hearts += 1
                 let id = UUID()
                 bursts.append(id)
+                let wordID = word.persistentModelID
+                heartHeld = wordID
                 Task {
-                    try? await Task.sleep(for: .seconds(HeartBurst.length(lead: heartHold) + 0.1))
+                    try? await Task.sleep(for: .seconds(HeartBurst.length(lead: heartHold)))
+                    // The floating heart has gone: the card's own heart settles in, gently.
+                    if heartHeld == wordID {
+                        withAnimation(.smooth(duration: 0.5)) { heartHeld = nil }
+                    }
+                    try? await Task.sleep(for: .seconds(0.1))
                     bursts.removeAll { $0 == id }
                 }
             } else {
+                if heartHeld == word.persistentModelID { heartHeld = nil }
                 word.collections.removeAll { $0.isFavorites }
             }
         }
@@ -374,7 +442,12 @@ struct DeckView: View {
     }
 
     private func tapCard(_ word: Word) {
-        if askOpen { closeAsk() } else if deleteOpen { closeDelete() } else { openDetail(word) }
+        if askOpen { closeAsk() } else if deleteOpen { closeDelete() }
+        else if study != nil {
+            // Critically damped: an overshoot past edge-on reads as the card rocking.
+            withAnimation(.spring(duration: 0.3, bounce: 0)) { flipped.toggle() }
+        }
+        else { openDetail(word) }
     }
 
     private func unpark() {
@@ -443,13 +516,19 @@ struct DeckView: View {
         detailWord = word
     }
 
+    /// Search's pick when it came from the AI (it has a reason to show).
+    private var aiPick: Binding<SearchPick?> {
+        Binding(get: { searchPick?.note != nil ? searchPick : nil },
+                set: { searchPick = $0 })
+    }
+
     private func openSearch() {
-        withAnimation(.strongEaseOut(0.25)) { showSearch = true }
+        showSearch = true
     }
 
     private func closeSearch() {
         dismissKeyboard()
-        withAnimation(.strongEaseOut(0.18)) { showSearch = false }
+        showSearch = false
     }
 
     private func closeAsk() {
@@ -493,23 +572,62 @@ struct DeckView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    private func caption(count: Int, i: Int) -> String {
-        let name = collection?.name ?? "All words"
-        return count == 0 ? name : "\(name) · \(i + 1) of \(count)"
+    struct CollectHold {
+        let pull: CGFloat
+        let armed: Bool
     }
 
-    /// Labels uncovered as the card is pulled vertically; opacity is derived
-    /// from the drag offset so they can never drift from the gesture.
-    private var gestureHints: some View {
-        let pull = offset.height
-        return VStack {
-            Label("Add to collection", systemImage: "rectangle.stack.badge.plus")
-                .opacity(Double(min(1, max(0, pull / 60))))
-            Spacer()
+    private let bookmarkSize: CGFloat = 44
+
+    /// The bookmark revealed as the card is pulled down. It sits on its own at the
+    /// top of the deck area, apart from the card, and rises a little and grows into
+    /// focus as you pull. Position, size and focus are derived from the drag offset,
+    /// so they never drift from the gesture. Once the pull is armed (the haptic) it
+    /// darkens and pops slightly larger on a spring: full size alone isn't "ready".
+    /// Reduce Motion drops the rise and growth and keeps the fade and the tint.
+    private func gestureHints(in size: CGSize) -> some View {
+        let pull = collectHold?.pull ?? offset.height
+        let armed = collectHold?.armed ?? collectArmed
+        let p = min(1, max(0, pull / collectPull(size)))
+        return Image(systemName: "bookmark.fill")
+            .font(.system(size: 40, weight: .semibold))
+            .frame(width: bookmarkSize, height: bookmarkSize)
+            .animation(.spring(duration: 0.3, bounce: 0.3)) {
+                $0.foregroundStyle(armed ? Color.ink : Color.ink3)
+                    .scaleEffect(armed && !reduceMotion ? 1.1 : 1)
+            }
+            .scaleEffect(reduceMotion ? 1 : 0.5 + 0.5 * p)
+            .blur(radius: 4 * (1 - p) + (collectGone ? 2 : 0))
+            .opacity(collectGone ? 0 : p)
+            .offset(y: reduceMotion ? 0 : 18 * (1 - p))
+            .padding(.top, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// How far the card has moved when the finger reaches SwipeCard's 110 pt commit
+    /// distance: a downward pull rubber-bands against 60% of the card's height.
+    private func collectPull(_ size: CGSize) -> CGFloat {
+        let limit = cardHeight(size) * 0.6
+        guard limit > 0 else { return 50 }
+        return (1 - 1 / (110 * 0.55 / limit + 1)) * limit
+    }
+
+    /// The bookmark stays where the release left it and fades out on a short curve,
+    /// then goes back to following the pull once it is invisible.
+    private func holdBookmark() {
+        collectHold = CollectHold(pull: offset.height, armed: collectArmed)
+        withAnimation(.strongEaseOut(0.18), completionCriteria: .logicallyComplete) {
+            collectGone = true
+        } completion: {
+            var still = Transaction()
+            still.disablesAnimations = true
+            withTransaction(still) {
+                collectHold = nil
+                collectGone = false
+            }
         }
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(.ink3)
-        .padding(.vertical, 2)
     }
 
     // MARK: Moving between cards
@@ -529,6 +647,8 @@ struct DeckView: View {
         let to: CGFloat
         /// Thrown while swiping fast: flies off without fading.
         var simple = false
+        /// A study card leaves showing the side it was on.
+        var flipped = false
     }
 
     /// A drag starting this soon after a throw counts as fast swiping.
@@ -547,7 +667,7 @@ struct DeckView: View {
         if let side = underSide, dx != 0 || flying.isEmpty {
             let neighbor = side == .left ? i + 1 : i - 1
             if words.indices.contains(neighbor) {
-                CardFace(word: words[neighbor])
+                face(words[neighbor], flipped: false)
                     .underCard(abs(dx) / width, simple: quick)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
@@ -599,7 +719,7 @@ struct DeckView: View {
         #endif
         let next = dir == .left ? i + 1 : i - 1
         let card = FlyingCard(word: words[i], from: offset.width,
-                              to: dir == .left ? -travel(width) : travel(width), simple: quick)
+                              to: dir == .left ? -travel(width) : travel(width), simple: quick, flipped: flipped)
         quickUntil = CACurrentMediaTime() + quickWindow
         // The throw's travel; its fade and the rise carry their own short curves.
         let spring = Animation.interpolatingSpring(duration: 0.3, bounce: 0,
@@ -611,6 +731,7 @@ struct DeckView: View {
             offset = .zero
             riseFrom = abs(card.from) / width
             riseSimple = card.simple
+            flipped = false
         }
         withAnimation(spring, completionCriteria: .logicallyComplete) {
             if panelHold == nil { panelHold = words[i] }
@@ -645,22 +766,286 @@ struct DeckView: View {
         }
     }
 
-    private var bottomBar: some View {
-        HStack {
-            // Unframed, but it keeps the circle's 64 pt touch target.
-            Button { showCollections = true } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 22, weight: .semibold))
-                    .frame(width: 64, height: 64)
-                    .contentShape(Rectangle())
+    /// The menu (collections, settings) on the left. Inside All words or a collection
+    /// the menu becomes a back chevron home, and the scope's name is the title.
+    private var topBar: some View {
+        ZStack {
+            if let scope {
+                Text(scope.title)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.ink)
+                    .lineLimit(1)
+                    .padding(.horizontal, 52)
+                    .transition(.blurReplace)
+                    .accessibilityAddTraits(.isHeader)
             }
-            .buttonStyle(PressStyle())
-            .accessibilityLabel("Collections")
+            HStack {
+                // Unframed, with a 44 pt touch target; the glyph lines up with the card's edge.
+                Button {
+                    if scope == nil { showCollections = true } else { scope = nil }
+                } label: {
+                    Image(systemName: scope == nil ? "line.3.horizontal" : "chevron.left")
+                        .font(.system(size: 22, weight: .semibold))
+                        .contentTransition(.symbolEffect(.replace))
+                        .frame(width: 44, height: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel(scope == nil ? "Menu" : "Back")
+                Spacer()
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: scope)
+    }
+
+    private func bottomBar(count: Int, i: Int) -> some View {
+        HStack(alignment: .center) {
+            if count > 0 {
+                Text("\(Text("\(i + 1)").foregroundStyle(.ink))\(Text("/\(count)").foregroundStyle(.ink3))")
+                    .font(.system(size: 34, weight: .bold).monospacedDigit())
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.3), value: i)
+                    .accessibilityLabel("Card \(i + 1) of \(count)")
+            }
             Spacer()
-            // Adding a word starts in Search.
-            CircleButton(systemImage: "plus", label: "Add word") { openSearch() }
+            if let scope {
+                // Inside All words or a collection the main action is studying it.
+                Button { startStudy(scope) } label: {
+                    Text("Study")
+                        .font(.headline)
+                        .padding(.horizontal, 28)
+                        .frame(height: 64)
+                        .background(Theme.control, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PressStyle())
+                .disabled(count == 0)
+                .opacity(count == 0 ? 0.4 : 1)
+                .transition(.blurReplace)
+            } else {
+                // Adding a word starts in Search.
+                CircleButton(systemImage: "magnifyingglass", label: "Search",
+                             accent: Accent(rawValue: accentRaw) ?? .ink) { openSearch() }
+                    .transition(.blurReplace)
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: scope)
+        .padding(.bottom, 8)
+    }
+
+    // MARK: Study
+
+    /// Long-press delete is a deck action; a study session has none.
+    private var longPress: (() -> Void)? {
+        study == nil ? { openDelete() } : nil
+    }
+
+    @ViewBuilder
+    private var topChrome: some View {
+        if let study {
+            studyTopBar(study).transition(.blurReplace)
+        } else {
+            topBar.transition(.blurReplace)
+        }
+    }
+
+    @ViewBuilder
+    private func bottomChrome(count: Int, i: Int) -> some View {
+        if let study {
+            Group {
+                if study.queue.isEmpty { studyEndBar } else { gradeBar }
+            }
+            .transition(.blurReplace)
+        } else {
+            bottomBar(count: count, i: i).transition(.blurReplace)
+        }
+    }
+
+    /// The deck's card, or in a study session the word-first card that turns over.
+    @ViewBuilder
+    private func face(_ word: Word, flipped: Bool) -> some View {
+        if study != nil {
+            StudyCard(word: word, flipped: flipped)
+        } else {
+            CardFace(word: word, heartHeld: heartHeld == word.persistentModelID)
+        }
+    }
+
+    /// ✕ where the menu was, sized to stand with the counter; the progress pill centred;
+    /// the deck's big counter on the right: where you are among the cards still to grade.
+    private func studyTopBar(_ s: StudySession) -> some View {
+        let count = s.queue.count
+        let i = min(index, max(count - 1, 0))
+        return ZStack {
+            studyProgress(s)
+            HStack {
+                Button(action: endStudy) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 28, weight: .bold))
+                        .frame(width: 44, height: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("End study")
+                Spacer()
+                if count > 0 {
+                    Text("\(Text("\(i + 1)").foregroundStyle(.ink))\(Text("/\(count)").foregroundStyle(.ink3))")
+                        .font(.system(size: 34, weight: .bold).monospacedDigit())
+                        .contentTransition(.numericText())
+                        .animation(.snappy(duration: 0.3), value: i)
+                        .animation(.snappy(duration: 0.3), value: count)
+                        .accessibilityLabel("Card \(i + 1) of \(count) left")
+                }
+            }
+        }
+    }
+
+    /// A short, thick pill that fills as cards are graded. The fill scales from the
+    /// leading edge (a transform, not a width), clipped to the track's capsule.
+    private func studyProgress(_ s: StudySession) -> some View {
+        ZStack(alignment: .leading) {
+            Capsule().fill(Color.ink.opacity(0.1))
+            Rectangle().fill(Color.ink.opacity(0.7))
+                .scaleEffect(x: s.progress, anchor: .leading)
+        }
+        .frame(width: 56, height: 6)
+        .clipShape(Capsule())
+        .animation(.snappy(duration: 0.3), value: s.progress)
+        .accessibilityElement()
+        .accessibilityLabel("Progress")
+        .accessibilityValue("\(Int((s.progress * 100).rounded())) percent")
+    }
+
+    /// The three grades, colour-coded like a traffic light: they map to FSRS's
+    /// Again, Hard and Good.
+    private var gradeBar: some View {
+        HStack(spacing: 12) {
+            gradeButton("Forgot", .again, tint: .red)
+            gradeButton("Almost", .hard, tint: .orange)
+            gradeButton("Knew it", .good, tint: .green)
         }
         .padding(.bottom, 8)
+    }
+
+    private func gradeButton(_ title: String, _ g: Grade, tint: Color) -> some View {
+        Button { grade(g) } label: {
+            Text(title)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(maxWidth: .infinity)
+                .frame(height: 64)
+                .background(tint.opacity(0.14), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(PressStyle(pressedScale: 0.97))
+    }
+
+    private var studyEndBar: some View {
+        Button(action: endStudy) {
+            Text("Done")
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 64)
+                .background(Theme.control, in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(PressStyle(pressedScale: 0.97))
+        .padding(.bottom, 8)
+    }
+
+    private func studyDoneCard(_ s: StudySession) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(s.reviewed == 0 ? "Nothing due" : "Done for now")
+                .font(.system(size: 40, weight: .bold))
+            Text(s.reviewed == 0
+                 ? (s.scope == .all ? "Every word is scheduled for later."
+                    : "Every word in \(s.scope.title) is scheduled for later.")
+                 : "\(s.reviewed) reviews. Words come back when you're about to forget them.")
+                .font(.title3).foregroundStyle(.ink3)
+            Spacer()
+            Button { startStudy(s.scope, all: true) } label: {
+                Text("Study everything anyway")
+                    .font(.headline).frame(maxWidth: .infinity).frame(height: 56)
+                    .background(Theme.control, in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(PressStyle(pressedScale: 0.97))
+            .disabled(s.scope.words(from: allWords).isEmpty)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.card, in: Theme.cardShape)
+    }
+
+    private func startStudy(_ scope: DeckScope) { startStudy(scope, all: false) }
+
+    /// Starts with the words due now (or every word, `all`), most overdue first.
+    private func startStudy(_ scope: DeckScope, all: Bool) {
+        let queue = StudySession.queue(from: scope.words(from: allWords), all: all)
+        let back = study?.returnIndex ?? index
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            offset = .zero
+            riseFrom = 0
+            riseSimple = false
+            underSide = nil
+            flipped = false
+        }
+        withAnimation(.snappy(duration: 0.3)) {
+            study = StudySession(scope: scope, queue: queue, total: queue.count, returnIndex: back)
+            index = 0
+        }
+    }
+
+    /// Grades already given are saved as they happen, so ending keeps them.
+    private func endStudy() {
+        guard let s = study else { return }
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            offset = .zero
+            riseFrom = 0
+            riseSimple = false
+            underSide = nil
+            flipped = false
+        }
+        withAnimation(.snappy(duration: 0.3)) {
+            study = nil
+            index = s.returnIndex
+        }
+    }
+
+    /// Schedules the card on screen and throws it off to the left, the way a swipe
+    /// forward would, while the next ungraded card rises into its place. Again puts
+    /// the word back on the end of the session.
+    private func grade(_ g: Grade) {
+        guard var s = study, !s.queue.isEmpty, !askOpen else { return }
+        let i = min(index, s.queue.count - 1)
+        let word = s.queue[i]
+        FSRS.review(word, grade: g)
+        try? context.save()
+        s.queue.remove(at: i)
+        if g == .again { s.queue.append(word) }
+        s.reviewed += 1
+        let card = FlyingCard(word: word, from: 0, to: -travel(cardArea.width), flipped: flipped)
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            offset = .zero
+            riseFrom = 0
+            riseSimple = false
+            underSide = nil
+            flipped = false
+        }
+        withAnimation(.spring(duration: 0.3, bounce: 0), completionCriteria: .logicallyComplete) {
+            study = s
+            // The next card slides into this slot; past the end, wrap to the first skipped one.
+            index = i < s.queue.count ? i : 0
+            flying.append(card)
+        } completion: {
+            flying.removeAll { $0.id == card.id }
+        }
     }
 
     // MARK: Behaviour
@@ -677,6 +1062,7 @@ struct DeckView: View {
         case .left, .right: break // handed off to flip(_:velocity:words:i:width:)
         case .up: askOpen = true
         case .down:
+            holdBookmark()
             collectWord = words[i]
         }
     }
@@ -686,7 +1072,7 @@ struct DeckView: View {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-hitchLog") { HitchMonitor.shared.start() }
         if args.contains("-layerDump") { LayerCensus.start() }
-        if args.contains("-seedDemo"), allWords.isEmpty { await DemoSeed.run(context) }
+        if args.contains("-seedDemo") { await DemoSeed.run(context) }
         if let i = args.firstIndex(of: "-demo"), let screen = args[safe: i + 1] {
             try? await Task.sleep(for: .milliseconds(600))
             switch screen {
@@ -695,8 +1081,10 @@ struct DeckView: View {
                 askOpen = true
                 withAnimation(.spring(duration: 0.45, bounce: 0)) { offset = CGSize(width: 0, height: -askParkDistance) }
             case "study":
-                studyCollection = try? context.fetch(FetchDescriptor<WordCollection>()).first
-            case "collections": showCollections = true
+                let all = (try? context.fetch(FetchDescriptor<WordCollection>())) ?? []
+                if let c = all.first(where: { !$0.words.isEmpty }) { startStudy(.collection(c), all: true) }
+            case "menu": showCollections = true
+            case "collections": menuOnCollections = true; showCollections = true
             case "collect": collectWord = words.first
             case "detail": detailWord = words.first
             default: break
@@ -709,10 +1097,14 @@ struct DeckView: View {
 #if DEBUG
 enum DemoSeed {
     static func run(_ context: ModelContext) async {
-        let literary = WordCollection(name: "Literary")
-        context.insert(literary)
-        let words = ["lambent", "tacit", "belie", "susurrus", "crepuscular", "ineffable"]
-        for (n, text) in words.enumerated() {
+        // Adds only what is missing, so it can be run again on a deck that already has words.
+        let existing = Set((try? context.fetch(FetchDescriptor<Word>()))?.map(\.text) ?? [])
+        let literary = (try? context.fetch(FetchDescriptor<WordCollection>()))?.first { $0.name == "Literary" }
+            ?? { let c = WordCollection(name: "Literary"); context.insert(c); return c }()
+        let words = ["lambent", "tacit", "belie", "susurrus", "crepuscular", "ineffable",
+                     "sonorous", "ephemeral", "perspicacious", "halcyon", "limpid", "evanescent",
+                     "pellucid", "obdurate", "sanguine", "laconic"]
+        for (n, text) in words.enumerated() where !existing.contains(text) {
             guard let senses = try? await Wiktionary.lookup(text) else { continue }
             let w = Word(text: text, senses: senses, createdAt: .now.addingTimeInterval(Double(-n)))
             context.insert(w)
@@ -734,12 +1126,12 @@ private struct RowReveal: ViewModifier {
     }
 }
 
-/// The like burst: a soft heart blooms out of the Favorite row's icon, then floats up
+/// The like burst: a soft heart blooms out of the Favorite button's icon, then floats up
 /// past the descending card and off the top of the screen, fading and softening as it
 /// goes. Keyframes, because the bloom and the float are different motions. Each favorite
 /// gets its own heart (see `bursts`). Reduce Motion keeps the bloom and fade, without the float.
 private struct HeartBurst: View {
-    /// The row's heart icon, measured from the row's centre (`heartIconX`). Applied
+    /// The Favorite button's heart icon, measured from the action row's centre. Applied
     /// outside the keyframes so the heart stays on the icon if the label reflows.
     let iconX: CGFloat
     /// How far up it travels: enough to clear the top of the screen.
@@ -835,15 +1227,15 @@ private struct HoldToDelete: View {
 
     var body: some View {
         label(ink: .red)
-            .background(Color.red.opacity(0.14), in: Theme.actionShape)
+            .background(Color.red.opacity(0.14), in: Theme.cardActionShape)
             .overlay {
                 label(ink: .white)
-                    .background(Color.red, in: Theme.actionShape)
+                    .background(Color.red, in: Theme.cardActionShape)
                     .mask(alignment: .leading) {
                         Rectangle().scaleEffect(x: progress, anchor: .leading)
                     }
             }
-            .contentShape(Theme.actionShape)
+            .contentShape(Theme.cardActionShape)
             .scaleEffect(pressing ? 0.97 : 1)
             .animation(.spring(duration: 0.2, bounce: 0), value: pressing)
             .sensoryFeedback(.impact(weight: .heavy), trigger: done)
@@ -869,31 +1261,11 @@ private struct HoldToDelete: View {
     }
 
     private func label(ink: Color) -> some View {
-        Label("Hold to delete", systemImage: "trash")
+        Label("Hold", systemImage: "trash")
             .font(.body.weight(.semibold))
             .foregroundStyle(ink)
             .frame(maxWidth: .infinity)
             .frame(height: height)
-    }
-}
-
-/// Hosts AskView so it re-renders only when its word or open state changes. Its
-/// callbacks are fresh closures on every deck render, which SwiftUI cannot compare,
-/// so without this every frame of a card drag rebuilt the whole Ask panel.
-private struct AskPanel: View, Equatable {
-    let word: Word
-    let revealed: Bool
-    let onPull: (CGFloat) -> Void
-    let onPullEnd: (CGFloat, CGFloat) -> Void
-    let onClose: () -> Void
-
-    static func == (a: Self, b: Self) -> Bool {
-        a.word == b.word && a.revealed == b.revealed
-    }
-
-    var body: some View {
-        AskView(word: word, onPull: onPull, onPullEnd: onPullEnd, onClose: onClose, revealed: revealed)
-            .id(word.text)
     }
 }
 

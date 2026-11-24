@@ -86,23 +86,39 @@ struct PillFace: View {
     }
 
     @ViewBuilder private var face: some View {
-        let shape = Capsule()
         if state == .added {
-            shape.fill(Theme.control)
+            Capsule().fill(Theme.control)
         } else {
-            shape.fill(fill)
-                // Inset light along the top, a darker lip along the bottom.
-                .overlay {
-                    shape.strokeBorder(LinearGradient(colors: [highlight, .clear, lip],
-                                                      startPoint: .top, endPoint: .bottom),
-                                       lineWidth: 1)
-                        .opacity(down ? 0 : 1)
-                }
-                .overlay { shape.strokeBorder(edge, lineWidth: 0.5) }
-                // Tight, neutral drop shadow. No coloured glow.
-                .shadow(color: drop.opacity(down ? 0 : 1), radius: 0.5, y: 1)
-                .shadow(color: drop.opacity(down ? 0 : 0.8), radius: 1.5, y: 2)
+            RaisedFace(shape: Capsule(), down: down)
         }
+    }
+
+    private var labelInk: Color { state == .added ? .ink3 : .ink }
+}
+
+/// The raised key surface: a soft top-to-bottom gradient, light along the top
+/// edge, a darker lip at the bottom and a tight neutral shadow. Pressed, it
+/// goes flat and sinks.
+struct RaisedFace<S: InsettableShape>: View {
+    let shape: S
+    var down = false
+    @Environment(\.colorScheme) private var scheme
+
+    private var dark: Bool { scheme == .dark }
+
+    var body: some View {
+        shape.fill(fill)
+            // Inset light along the top, a darker lip along the bottom.
+            .overlay {
+                shape.strokeBorder(LinearGradient(colors: [highlight, .clear, lip],
+                                                  startPoint: .top, endPoint: .bottom),
+                                   lineWidth: 1)
+                    .opacity(down ? 0 : 1)
+            }
+            .overlay { shape.strokeBorder(edge, lineWidth: 0.5) }
+            // Tight, neutral drop shadow. No coloured glow.
+            .shadow(color: drop.opacity(down ? 0 : 1), radius: 0.5, y: 1)
+            .shadow(color: drop.opacity(down ? 0 : 0.8), radius: 1.5, y: 2)
     }
 
     private var fill: AnyShapeStyle {
@@ -115,8 +131,19 @@ struct PillFace: View {
     private var lip: Color { .black.opacity(dark ? 0.35 : 0.06) }
     private var edge: Color { dark ? .white.opacity(0.07) : .black.opacity(0.14) }
     private var drop: Color { .black.opacity(dark ? 0.6 : 0.14) }
+}
 
-    private var labelInk: Color { state == .added ? .ink3 : .ink }
+/// A button drawn as a raised key in the given shape: sinks 1pt and scales
+/// slightly while pressed.
+struct RaisedButtonStyle<S: InsettableShape>: ButtonStyle {
+    let shape: S
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background { RaisedFace(shape: shape, down: configuration.isPressed) }
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .offset(y: configuration.isPressed ? 1 : 0)
+            .animation(.spring(duration: 0.2, bounce: 0), value: configuration.isPressed)
+    }
 }
 
 private struct PillPress: ButtonStyle {

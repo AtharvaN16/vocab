@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Definition Numbering</title>
+<style>
+.app {
+  --card: #eaeaea; --control: #e6e6e6; --behind: #f4f4f4;
+  --ink: #121212; --ink2: #424242; --ink3: #808080; --ink4: #a3a3a3; --grain-op: .09;
+}
+.app[data-theme="dark"] {
+  --card: #1c1c1c; --control: #292929; --behind: #000;
+  --ink: #f5f5f5; --ink2: #cccccc; --ink3: #999999; --ink4: #6b6b6b; --grain-op: .06;
+}
+:root {
+  --fg: var(--foreground, #161616);
+  --muted-fg: var(--muted-foreground, #6b6b6b);
+  --line: var(--border, rgba(127,127,127,.28));
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, system-ui, sans-serif); color: var(--fg); }
+.lede { font-size: 14px; line-height: 1.5; color: var(--muted-fg); margin: 0 0 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
+.seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--muted-fg); background: none; border: 0; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { color: var(--fg); background: var(--line); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 28px 18px; }
+.cell { display: flex; flex-direction: column; align-items: center; }
+.cell h2 { align-self: stretch; font-size: 15px; margin: 0 0 2px; }
+.cell p.tag { align-self: stretch; font-size: 12.5px; line-height: 1.4; color: var(--muted-fg); margin: 0 0 10px; min-height: 52px; }
+
+.stage { position: relative; width: calc(390px * var(--s)); height: calc(844px * var(--s)); border-radius: calc(54px * var(--s)); overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line), 0 14px 30px -18px rgba(0,0,0,.35); --s: .56; }
+.screen { position: absolute; left: 0; top: 0; width: 390px; height: 844px; transform: scale(var(--s)); transform-origin: 0 0; overflow: hidden;
+  background: var(--card); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif; }
+.screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: var(--grain-op);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; background: #000; border-radius: 20px; }
+.clock { position: absolute; top: 20px; left: 48px; font-size: 17px; font-weight: 600; }
+.dx { position: absolute; top: 67px; left: 32px; width: 36px; height: 36px; border-radius: 50%; background: var(--control); display: grid; place-items: center; }
+.body { position: absolute; left: 32px; right: 32px; top: 131px; }
+.head { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.word { font-size: 44px; font-weight: 700; line-height: 52px; letter-spacing: -.01em; margin: 0; }
+.speak { width: 44px; height: 44px; display: grid; place-items: center; color: var(--ink3); }
+.bar { position: absolute; left: 24px; right: 24px; bottom: 42px; }
+.segs { display: flex; gap: 5px; margin-bottom: 22px; }
+.segs i { flex: 1; height: 4px; border-radius: 2px; background: var(--ink4); opacity: .35; }
+.segs i.on { background: var(--ink); opacity: 1; }
+.next { height: 56px; border-radius: 28px; background: var(--control); display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 18px; font-weight: 600; }
+
+/* The definitions: Theme.detailDefinitionFont, 28 pt semibold, secondary ink */
+.defs { display: grid; gap: 22px; }
+.def { font-size: 28px; font-weight: 600; line-height: 33px; color: var(--ink3); margin: 0; }
+
+/* A · Hanging numeral, same type */
+.v-hang .item { display: grid; grid-template-columns: 30px 1fr; }
+.v-hang .n { font-size: 28px; font-weight: 600; line-height: 33px; color: var(--ink4); font-variant-numeric: tabular-nums; }
+
+/* B · In the margin */
+.v-margin .item { position: relative; }
+.v-margin .n { position: absolute; left: -22px; top: 8px; font-size: 15px; font-weight: 600; color: var(--ink4); font-variant-numeric: tabular-nums; }
+
+/* C · Small number above */
+.v-above .n { display: block; font-size: 17px; font-weight: 600; color: var(--ink4); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+
+/* D · Badge */
+.v-badge .item { display: grid; grid-template-columns: 40px 1fr; align-items: start; }
+.v-badge .n { width: 28px; height: 28px; margin-top: 3px; border-radius: 50%; background: var(--control); color: var(--ink2);
+  display: grid; place-items: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* E · Dark numeral */
+.v-ink .n { color: var(--ink); font-variant-numeric: tabular-nums; margin-right: 10px; }
+
+/* F · Ruled */
+.v-rule .defs { gap: 0; }
+.v-rule .item { display: grid; grid-template-columns: 30px 1fr; padding: 18px 0; border-top: 1.5px solid color-mix(in srgb, var(--ink4) 35%, transparent); }
+.v-rule .item:first-child { border-top: 0; padding-top: 0; }
+.v-rule .n { font-size: 15px; font-weight: 600; color: var(--ink4); padding-top: 8px; font-variant-numeric: tabular-nums; }
+
+/* G · First leads */
+.v-lead .item:not(:first-child) .def { font-size: 22px; line-height: 27px; }
+.v-lead .item { display: grid; grid-template-columns: 30px 1fr; }
+.v-lead .n { font-size: 28px; font-weight: 600; line-height: 33px; color: var(--ink4); }
+.v-lead .item:not(:first-child) .n { font-size: 22px; line-height: 27px; }
+
+/* H · Big ghost numeral */
+.v-ghost .item { display: grid; grid-template-columns: 44px 1fr; }
+.v-ghost .n { font-size: 44px; font-weight: 700; line-height: 38px; color: var(--ink); opacity: .1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+</style>
+</head>
+<body>
+  <p class="lede">The Definitions page of the word detail view at the new sizes (word 44 pt bold, definitions 28 pt semibold). Each option shows a different way to number definitions. A word with only one definition shows no number in any of them.</p>
+  <div class="row">
+    <div class="seg" role="group" aria-label="Word">
+      <button data-word="0" aria-pressed="true">lambent · 3</button>
+      <button data-word="1" aria-pressed="false">perspicacious · 2 long</button>
+      <button data-word="2" aria-pressed="false">aplomb · 1</button>
+    </div>
+    <div class="seg" role="group" aria-label="Appearance">
+      <button data-theme-btn="light" aria-pressed="true">Light</button>
+      <button data-theme-btn="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="cell" data-v="hang"><h2>A · Hanging numeral</h2><p class="tag">"1." in the definition's own type, in the faintest ink. The text wraps clear of it.</p></div>
+    <div class="cell" data-v="margin"><h2>B · In the margin</h2><p class="tag">A small number in the page margin. The text column stays lined up with the word.</p></div>
+    <div class="cell" data-v="above"><h2>C · Small number above</h2><p class="tag">A small 17 pt number sitting above each definition, like a quiet label.</p></div>
+    <div class="cell" data-v="badge"><h2>D · Badge</h2><p class="tag">The number in a small grey circle, the app's control fill, beside the first line.</p></div>
+    <div class="cell" data-v="ink"><h2>E · Dark numeral</h2><p class="tag">The number in the darkest ink, the same as the word, running straight into the grey definition.</p></div>
+    <div class="cell" data-v="rule"><h2>F · Ruled</h2><p class="tag">A small margin number, with thin lines dividing the definitions.</p></div>
+    <div class="cell" data-v="lead"><h2>G · First leads</h2><p class="tag">The main definition stays at 28 pt; the others step down to 22 pt. All three are numbered.</p></div>
+    <div class="cell" data-v="ghost"><h2>H · Big ghost numeral</h2><p class="tag">A 44 pt numeral at 10% ink behind the start of each definition, in a magazine style.</p></div>
+  </div>
+
+<script>
+const WORDS = [
+  { w: 'lambent', d: ['Of light or fire: glowing or flickering softly.', 'Of wit: lightly brilliant.', 'Of eyes or the sky: softly bright.'] },
+  { w: 'perspicacious', d: ['Having a ready insight into and understanding of things; shrewd and discerning.', 'Clear-sighted; able to see clearly or far.'] },
+  { w: 'aplomb', d: ['Self-confidence or assurance, especially when in a demanding situation.'] },
+];
+const SPEAK = '<svg width="22" height="18" viewBox="0 0 22 18"><path d="M1 6h4l5-5v16l-5-5H1z" fill="currentColor"/><path d="M13.5 5.5a4.6 4.6 0 0 1 0 7M16.5 2.5a8.8 8.8 0 0 1 0 13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+const X = '<svg width="15" height="15" viewBox="0 0 15 15"><path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const CHEV = '<svg width="10" height="16" viewBox="0 0 10 16"><path d="M2 2l6 6-6 6" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+let wordIdx = 0, theme = 'light';
+
+function number(v, i) {
+  if (v === 'hang' || v === 'lead') return `${i + 1}.`;
+  return `${i + 1}`;
+}
+function defsHTML(v, defs) {
+  const many = defs.length > 1;
+  return defs.map((d, i) => {
+    if (!many) return `<div class="item solo"><p class="def">${d}</p></div>`;
+    const n = number(v, i);
+    if (v === 'ink') return `<div class="item"><p class="def"><span class="n">${n}</span>${d}</p></div>`;
+    if (v === 'above') return `<div class="item"><span class="n">${n}</span><p class="def">${d}</p></div>`;
+    return `<div class="item"><span class="n">${n}</span><p class="def">${d}</p></div>`;
+  }).join('');
+}
+function render() {
+  const e = WORDS[wordIdx];
+  document.querySelectorAll('.cell').forEach(cell => {
+    const v = cell.dataset.v;
+    let stage = cell.querySelector('.stage');
+    if (!stage) { stage = document.createElement('div'); stage.className = 'stage app'; cell.appendChild(stage); }
+    stage.setAttribute('data-theme', theme);
+    stage.innerHTML = `
+      <div class="screen v-${v}">
+        <div class="island"></div><div class="clock">9:41</div>
+        <div class="dx">${X}</div>
+        <div class="body">
+          <div class="head"><p class="word">${e.w}</p><div class="speak">${SPEAK}</div></div>
+          <div class="defs">${defsHTML(v, e.d)}</div>
+        </div>
+        <div class="bar">
+          <div class="segs"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="next"><span>In a sentence</span>${CHEV}</div>
+        </div>
+      </div>`;
+    // A single definition needs no hanging column.
+    stage.querySelectorAll('.item.solo').forEach(it => { it.style.display = 'block'; });
+  });
+}
+document.querySelectorAll('[data-word]').forEach(b => b.addEventListener('click', () => {
+  wordIdx = +b.dataset.word;
+  document.querySelectorAll('[data-word]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  render();
+}));
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.addEventListener('click', () => {
+  theme = b.dataset.themeBtn;
+  document.querySelectorAll('[data-theme-btn]').forEach(x => x.setAttribute('aria-pressed', x === b));
+  render();
+}));
+function fit() {
+  const w = document.querySelector('.cell').clientWidth;
+  const s = Math.min(0.7, Math.max(0.45, w / 390));
+  document.querySelectorAll('.stage').forEach(st => st.style.setProperty('--s', s.toFixed(3)));
+}
+render(); fit();
+addEventListener('resize', () => { fit(); });
+</script>
+</body>
+</html>
